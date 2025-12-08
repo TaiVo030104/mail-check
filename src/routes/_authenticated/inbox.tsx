@@ -1,18 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
-import { MailboxSidebar } from '@/components/pages/emails/mailbox-sidebar';
-import { EmailList } from '@/components/pages/emails/email-list';
-import { EmailDetail } from '@/components/pages/emails/email-detail';
-import { KeyboardShortcutsHelp } from '@/components/pages/emails/keyboard-shortcuts-help';
-import { EmailFilterValues } from '@/components/pages/emails/email-filters';
+import { createFileRoute } from "@tanstack/react-router";
+import { LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
+import { useEffect, useState } from "react";
+
 // import { ThemeToggle } from '@/components/theme-toggle';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Button } from '@/components/ui/button';
-import { PenSquare, RefreshCw, Mail, LogOut, User, Settings, Shield, Menu } from 'lucide-react';
-import { ComposeDialog } from '@/components/pages/emails/compose-dialog';
-import { useMailboxes, useMarkAsRead, useToggleStar, useDeleteEmail, useEmailsByFolder } from '@/hooks/react-query/useEmails';
-import { useSignOut, useUserProfile } from '@/hooks/react-query/useAuth';
-import { useUserRole } from '@/hooks/useRole';
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ComposeDialog } from "@/components/pages/emails/compose-dialog";
+import { EmailDetail } from "@/components/pages/emails/email-detail";
+import { EmailFilterValues } from "@/components/pages/emails/email-filters";
+import { EmailKanban } from "@/components/pages/emails/email-kanban";
+import { EmailList } from "@/components/pages/emails/email-list";
+import { KeyboardShortcutsHelp } from "@/components/pages/emails/keyboard-shortcuts-help";
+import { MailboxSidebar } from "@/components/pages/emails/mailbox-sidebar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,15 +19,25 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useSignOut, useUserProfile } from "@/hooks/react-query/useAuth";
+import {
+  useDeleteEmail,
+  useEmailsByFolder,
+  useMailboxes,
+  useMarkAsRead,
+  useToggleStar,
+} from "@/hooks/react-query/useEmails";
+import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/useRole";
 
-export const Route = createFileRoute('/_authenticated/inbox')({
+export const Route = createFileRoute("/_authenticated/inbox")({
   component: InboxPage,
 });
 
 function InboxPage() {
-  const [selectedFolder, setSelectedFolder] = useState('inbox');
+  const [selectedFolder, setSelectedFolder] = useState("inbox");
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
@@ -37,8 +46,14 @@ function InboxPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [filters, _] = useState<EmailFilterValues>({});
+  const [viewMode, setViewMode] = useState<"email" | "kanban">("email");
   const { refetch: refetchMailboxes } = useMailboxes();
-  const { refetch: refetchEmails } = useEmailsByFolder(selectedFolder, currentPage, pageSize, filters);
+  const { refetch: refetchEmails } = useEmailsByFolder(
+    selectedFolder,
+    currentPage,
+    pageSize,
+    filters
+  );
   const { data: userProfile } = useUserProfile();
   const signOutMutation = useSignOut();
   const markAsReadMutation = useMarkAsRead();
@@ -61,17 +76,17 @@ function InboxPage() {
       }
 
       switch (e.key.toLowerCase()) {
-        case 'c':
+        case "c":
           // Compose new email
           e.preventDefault();
           setIsComposeOpen(true);
           break;
-        case '?':
+        case "?":
           // Show keyboard shortcuts help
           e.preventDefault();
           setIsKeyboardHelpOpen(true);
           break;
-        case 'r':
+        case "r":
           // Refresh
           if (e.ctrlKey || e.metaKey) {
             // Allow default browser refresh
@@ -80,34 +95,34 @@ function InboxPage() {
           e.preventDefault();
           handleRefresh();
           toast({
-            title: 'Refreshing',
-            description: 'Updating mailbox...',
+            title: "Refreshing",
+            description: "Updating mailbox...",
           });
           break;
-        case 's':
+        case "s":
           // Star/unstar selected email
           if (selectedEmailId && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             toggleStarMutation.mutate(selectedEmailId);
           }
           break;
-        case 'delete':
-        case 'd':
+        case "delete":
+        case "d":
           // Delete selected email (only 'd' key, not 'delete' key to avoid accidental deletion)
-          if (selectedEmailId && e.key === 'd' && !e.ctrlKey && !e.metaKey) {
+          if (selectedEmailId && e.key === "d" && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             deleteEmailMutation.mutate(selectedEmailId, {
               onSuccess: () => {
                 handleCloseDetail();
                 toast({
-                  title: 'Email deleted',
-                  description: 'Email moved to trash',
+                  title: "Email deleted",
+                  description: "Email moved to trash",
                 });
               },
             });
           }
           break;
-        case 'escape':
+        case "escape":
           // Close email detail or compose
           if (selectedEmailId) {
             e.preventDefault();
@@ -117,8 +132,8 @@ function InboxPage() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedEmailId, isComposeOpen, toggleStarMutation, deleteEmailMutation, toast]);
 
   const handleRefresh = () => {
@@ -155,22 +170,40 @@ function InboxPage() {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
       {/* Top Navigation Bar */}
-      <header className="flex h-14 md:h-16 items-center justify-between border-b bg-background px-3 md:px-4" role="banner">
+      <header
+        className="flex h-14 items-center justify-between border-b bg-background px-3 md:h-16 md:px-4"
+        role="banner"
+      >
         <div className="flex items-center gap-2 md:gap-3">
           {/* Mobile menu toggle */}
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden h-9 w-9"
+            className="h-9 w-9 md:hidden"
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
             aria-label="Toggle sidebar menu"
             aria-expanded={isMobileSidebarOpen}
           >
             <Menu className="h-5 w-5" />
           </Button>
-          
-          <Mail className="h-5 w-5 md:h-6 md:w-6 text-primary" aria-hidden="true" />
-          <h1 className="text-lg md:text-xl font-bold">Email Dashboard</h1>
+
+          <Mail className="h-5 w-5 text-primary md:h-6 md:w-6" aria-hidden="true" />
+          <h1 className="text-lg font-bold md:text-xl">Email Dashboard</h1>
+
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={(v) => v && setViewMode(v as "email" | "kanban")}
+            className="hidden md:flex"
+            aria-label="View mode"
+          >
+            <ToggleGroupItem value="email" aria-label="Email view">
+              Email
+            </ToggleGroupItem>
+            <ToggleGroupItem value="kanban" aria-label="Kanban view">
+              Kanban
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
@@ -178,18 +211,14 @@ function InboxPage() {
           <Button
             onClick={() => setIsComposeOpen(true)}
             size="icon"
-            className="md:hidden h-9 w-9 rounded-full"
+            className="h-9 w-9 rounded-full md:hidden"
             aria-label="Compose email"
           >
             <PenSquare className="h-4 w-4" />
           </Button>
-          
+
           {/* Desktop Compose Button */}
-          <Button
-            onClick={() => setIsComposeOpen(true)}
-            size="sm"
-            className="hidden md:flex"
-          >
+          <Button onClick={() => setIsComposeOpen(true)} size="sm" className="hidden md:flex">
             <PenSquare className="mr-2 h-4 w-4" />
             Compose
           </Button>
@@ -200,11 +229,11 @@ function InboxPage() {
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="relative h-10 w-10 rounded-full"
-                aria-label={`User menu for ${userProfile?.username || 'user'}`}
+                aria-label={`User menu for ${userProfile?.username || "user"}`}
               >
                 {userProfile?.picture ? (
                   <img
@@ -223,8 +252,8 @@ function InboxPage() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{userProfile?.username || 'User'}</p>
-                  <p className="text-xs text-muted-foreground">{userProfile?.email || ''}</p>
+                  <p className="text-sm font-medium">{userProfile?.username || "User"}</p>
+                  <p className="text-xs text-muted-foreground">{userProfile?.email || ""}</p>
                   {userRole && (
                     <p className="text-xs text-muted-foreground">
                       Role: <span className="font-semibold capitalize">{userRole}</span>
@@ -233,32 +262,46 @@ function InboxPage() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => window.location.href = '/profile'} className="cursor-pointer">
+              <DropdownMenuItem
+                onClick={() => (window.location.href = "/profile")}
+                className="cursor-pointer"
+              >
                 <User className="mr-2 h-4 w-4" />
                 View Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.location.href = '/settings'} className="cursor-pointer">
+              <DropdownMenuItem
+                onClick={() => (window.location.href = "/settings")}
+                className="cursor-pointer"
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsKeyboardHelpOpen(true)} className="cursor-pointer">
-                <span className="mr-2 h-4 w-4 flex items-center justify-center font-bold text-xs">?</span>
+              <DropdownMenuItem
+                onClick={() => setIsKeyboardHelpOpen(true)}
+                className="cursor-pointer"
+              >
+                <span className="mr-2 flex h-4 w-4 items-center justify-center text-xs font-bold">
+                  ?
+                </span>
                 Keyboard Shortcuts
               </DropdownMenuItem>
-              {userRole === 'admin' && (
-                <DropdownMenuItem onClick={() => window.location.href = '/admin'} className="cursor-pointer">
+              {userRole === "admin" && (
+                <DropdownMenuItem
+                  onClick={() => (window.location.href = "/admin")}
+                  className="cursor-pointer"
+                >
                   <Shield className="mr-2 h-4 w-4" />
                   Admin Panel
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={handleLogout}
                 disabled={signOutMutation.isPending}
                 className="cursor-pointer text-destructive focus:text-destructive"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                {signOutMutation.isPending ? 'Logging out...' : 'Logout'}
+                {signOutMutation.isPending ? "Logging out..." : "Logout"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -267,128 +310,127 @@ function InboxPage() {
 
       {/* Main Content Area */}
       <main className="flex flex-1 overflow-hidden" role="main">
-        {/* Mobile Sidebar Overlay */}
-        {isMobileSidebarOpen && (
-          <div 
-            className="fixed inset-0 z-40 bg-black/50 md:hidden" 
-            onClick={() => setIsMobileSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
-        
-        {/* Column 1: Mailbox Sidebar - 20% width on desktop */}
-        <nav 
-          className={`w-[280px] flex-shrink-0 border-r bg-background md:w-64 lg:w-72 transition-transform duration-200 ${
-            isMobileDetailView 
-              ? 'hidden md:block' 
-              : isMobileSidebarOpen 
-                ? 'fixed left-0 top-14 bottom-0 z-50 md:relative md:top-0' 
-                : 'hidden md:block'
-          }`}
-          aria-label="Mailbox folders"
-        >
-          <div className="border-b bg-background p-3 md:hidden">
-            <Button
-              onClick={() => {
-                setIsComposeOpen(true);
-                setIsMobileSidebarOpen(false);
-              }}
-              className="w-full gap-2"
-              size="default"
-            >
-              <PenSquare className="h-4 w-4" />
-              Compose
-            </Button>
+        {viewMode === "kanban" ? (
+          <div className="flex w-full flex-1 overflow-hidden p-4">
+            <EmailKanban onBackToEmail={() => setViewMode("email")} />
           </div>
-          <MailboxSidebar
-            selectedFolder={selectedFolder}
-            onSelectFolder={(folder) => {
-              setSelectedFolder(folder);
-              setSelectedEmailId(null);
-              setIsMobileDetailView(false);
-              setIsMobileSidebarOpen(false);
-            setCurrentPage(1);
-          }}
-        />
-        </nav>        {/* Column 2: Email List - 40% width on desktop */}
-        <ErrorBoundary onReset={() => setSelectedFolder(selectedFolder)}>
-          <section 
-            className={`flex h-full w-full flex-shrink-0 flex-col border-r bg-background md:w-[40%] ${isMobileDetailView ? 'hidden md:flex' : 'flex'}`}
-            aria-label="Email list"
-          >
-            <div className="flex-shrink-0 flex items-center justify-between border-b bg-muted/30 px-3 md:px-4 py-2.5 md:py-3">
-              <h2 className="text-lg font-semibold capitalize">{selectedFolder}</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRefresh}
-                className="h-8 w-8"
-                aria-label="Refresh mailbox"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Search and Filters */}
-            {/* <EmailFilters
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              onClearFilters={handleClearFilters}
-            /> */}
-            
-            <div className="flex-1 flex flex-col min-h-0">
-              <EmailList
-              folder={selectedFolder}
-              selectedEmailId={selectedEmailId}
-              onSelectEmail={handleSelectEmail}
-              page={currentPage}
-              pageSize={pageSize}
-              filters={filters}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
+        ) : (
+          <>
+            {/* Mobile Sidebar Overlay */}
+            {isMobileSidebarOpen && (
+              <div
+                className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                aria-hidden="true"
               />
-            </div>
-          </section>
-        </ErrorBoundary>
-
-        {/* Column 3: Email Detail - 40% width on desktop */}
-        <ErrorBoundary onReset={() => setSelectedEmailId(null)}>
-          <article 
-            className={`flex-1 bg-background ${isMobileDetailView ? 'block' : 'hidden md:block'}`}
-            aria-label="Email detail"
-          >
-            {selectedEmailId ? (
-              <EmailDetail
-                emailId={selectedEmailId}
-                onClose={handleCloseDetail}
-                onDelete={handleCloseDetail}
-                onBack={handleCloseDetail}
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <Mail className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
-                  <p className="text-lg font-medium">No email selected</p>
-                  <p className="text-sm">Select an email from the list to view its contents</p>
-                </div>
-              </div>
             )}
-          </article>
-        </ErrorBoundary>
+
+            {/* Column 1: Mailbox Sidebar - 20% width on desktop */}
+            <nav
+              className={`w-[280px] flex-shrink-0 border-r bg-background transition-transform duration-200 md:w-64 lg:w-72 ${
+                isMobileDetailView
+                  ? "hidden md:block"
+                  : isMobileSidebarOpen
+                    ? "fixed bottom-0 left-0 top-14 z-50 md:relative md:top-0"
+                    : "hidden md:block"
+              }`}
+              aria-label="Mailbox folders"
+            >
+              <div className="border-b bg-background p-3 md:hidden">
+                <Button
+                  onClick={() => {
+                    setIsComposeOpen(true);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className="w-full gap-2"
+                  size="default"
+                >
+                  <PenSquare className="h-4 w-4" />
+                  Compose
+                </Button>
+              </div>
+              <MailboxSidebar
+                selectedFolder={selectedFolder}
+                onSelectFolder={(folder) => {
+                  setSelectedFolder(folder);
+                  setSelectedEmailId(null);
+                  setIsMobileDetailView(false);
+                  setIsMobileSidebarOpen(false);
+                  setCurrentPage(1);
+                }}
+              />
+            </nav>
+
+            {/* Column 2: Email List - 40% width on desktop */}
+            <ErrorBoundary onReset={() => setSelectedFolder(selectedFolder)}>
+              <section
+                className={`flex h-full w-full flex-shrink-0 flex-col border-r bg-background md:w-[40%] ${
+                  isMobileDetailView ? "hidden md:flex" : "flex"
+                }`}
+                aria-label="Email list"
+              >
+                <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/30 px-3 py-2.5 md:px-4 md:py-3">
+                  <h2 className="text-lg font-semibold capitalize">{selectedFolder}</h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRefresh}
+                    className="h-8 w-8"
+                    aria-label="Refresh mailbox"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <EmailList
+                    folder={selectedFolder}
+                    selectedEmailId={selectedEmailId}
+                    onSelectEmail={handleSelectEmail}
+                    page={currentPage}
+                    pageSize={pageSize}
+                    filters={filters}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+              </section>
+            </ErrorBoundary>
+
+            {/* Column 3: Email Detail - 40% width on desktop */}
+            <ErrorBoundary onReset={() => setSelectedEmailId(null)}>
+              <article
+                className={`flex-1 bg-background ${isMobileDetailView ? "block" : "hidden md:block"}`}
+                aria-label="Email detail"
+              >
+                {selectedEmailId ? (
+                  <EmailDetail
+                    emailId={selectedEmailId}
+                    onClose={handleCloseDetail}
+                    onDelete={handleCloseDetail}
+                    onBack={handleCloseDetail}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <Mail className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
+                      <p className="text-lg font-medium">No email selected</p>
+                      <p className="text-sm">Select an email from the list to view its contents</p>
+                    </div>
+                  </div>
+                )}
+              </article>
+            </ErrorBoundary>
+          </>
+        )}
       </main>
 
-      <ComposeDialog
-        open={isComposeOpen}
-        onOpenChange={setIsComposeOpen}
-      />
+      <ComposeDialog open={isComposeOpen} onOpenChange={setIsComposeOpen} />
 
-      <KeyboardShortcutsHelp
-        open={isKeyboardHelpOpen}
-        onOpenChange={setIsKeyboardHelpOpen}
-      />
+      <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onOpenChange={setIsKeyboardHelpOpen} />
     </div>
   );
 }
