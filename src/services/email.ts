@@ -36,6 +36,11 @@ export interface Email {
   sentAt: string;
   folder: string;
   attachments?: Attachment[];
+  isSnoozed?: boolean;
+  snoozeUntil?: string;
+  snoozedAt?: string;
+  aiSummary?: string;
+  summarizedAt?: string;
 }
 
 export interface EmailDetail extends Email {
@@ -218,6 +223,38 @@ export const emailService = {
 
   async bulkMarkAsRead(emailIds: string[], isRead: boolean): Promise<{ message: string; modified: number }> {
     const response = await api.post('emails/bulk/read', { emailIds, isRead });
+    return response.data;
+  },
+
+  // Snooze features
+  async snoozeEmail(emailId: string, snoozeUntil: string): Promise<{ message: string; snoozeUntil: string }> {
+    const response = await api.post(`email/snooze/${emailId}`, { snoozeUntil });
+    return response.data;
+  },
+
+  async snoozeEmailWithPreset(emailId: string, preset: string, customDate?: string): Promise<{ message: string; snoozeUntil: string }> {
+    const response = await api.post(`email/snooze/${emailId}/preset`, { preset, customDate });
+    return response.data;
+  },
+
+  async unsnoozeEmail(emailId: string): Promise<{ message: string }> {
+    const response = await api.delete(`email/snooze/${emailId}`);
+    return response.data;
+  },
+
+  async getSnoozedEmails(): Promise<{ emails: Email[]; total: number }> {
+    const response = await api.get('email/snooze');
+    return response.data;
+  },
+
+  // AI features
+  async summarizeEmail(emailId: string): Promise<{ summary: string; summarizedAt: string; cached: boolean }> {
+    const response = await api.post(`email/ai/summarize/${emailId}`);
+    return response.data;
+  },
+
+  async generateReplyDraft(emailId: string): Promise<{ draft: string }> {
+    const response = await api.post(`email/ai/generate-reply/${emailId}`);
     return response.data;
   },
 };

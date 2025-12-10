@@ -1,9 +1,11 @@
 import { useEmailDetail, useToggleStar, useMarkAsRead, useDeleteEmail, useDownloadAttachment } from '@/hooks/react-query/useEmails';
 import { Button } from '@/components/ui/button';
-import { Loader2, Star, Reply, ReplyAll, Forward, Trash2, Mail, X, ArrowLeft, Paperclip, Download, FileIcon } from 'lucide-react';
+import { Loader2, Star, Reply, ReplyAll, Forward, Trash2, Mail, X, ArrowLeft, Paperclip, Download, FileIcon, Clock, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { ComposeDialog, ComposeMode } from './compose-dialog';
+import { SnoozeDialog } from './snooze-dialog';
+import { AiSummaryDialog } from './ai-summary-dialog';
 import { useState } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 
@@ -77,6 +79,8 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
   const downloadAttachmentMutation = useDownloadAttachment();
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMode, setComposeMode] = useState<ComposeMode>("compose");
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
 
   const handleToggleStar = () => {
     if (email) {
@@ -208,6 +212,26 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
           <Button variant="outline" size="sm" onClick={handleForward} className="gap-1.5 text-xs md:text-sm h-8 md:h-9">
             <Forward className="h-3.5 w-3.5 md:h-4 md:w-4" />
             <span className="hidden sm:inline">Forward</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSnoozeOpen(true)}
+            className="gap-1.5 text-xs md:text-sm h-8 md:h-9"
+            aria-label="Snooze"
+          >
+            <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            <span className="hidden lg:inline">Snooze</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAiSummaryOpen(true)}
+            className="gap-1.5 text-xs md:text-sm h-8 md:h-9"
+            aria-label="AI Summary"
+          >
+            <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-500" />
+            <span className="hidden lg:inline">AI Summary</span>
           </Button>
           <Button
             variant="outline"
@@ -448,6 +472,19 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         onOpenChange={setComposeOpen}
         mode={composeMode}
         initialData={email ? { email } : undefined}
+      />
+
+      <SnoozeDialog
+        emailId={email.id}
+        open={snoozeOpen}
+        onOpenChange={setSnoozeOpen}
+        onSuccess={onClose}
+      />
+
+      <AiSummaryDialog
+        emailId={email.id}
+        open={aiSummaryOpen}
+        onOpenChange={setAiSummaryOpen}
       />
     </div>
   );
