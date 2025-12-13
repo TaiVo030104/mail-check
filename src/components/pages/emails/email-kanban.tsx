@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useEmailsByFolder, useSnoozeEmail, useUnsnoozeEmail } from "@/hooks/react-query/useEmails";
+import { useEmailsByFolder, useUnsnoozeEmail } from "@/hooks/react-query/useEmails";
 import { useKanbanBoard, useMoveCard } from "@/hooks/react-query/useKanban";
 import { Email } from "@/services/email";
 import { format } from "date-fns";
@@ -32,7 +32,6 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
   const { data: archivedData, refetch: refetchArchived } = useEmailsByFolder("archive", 1, 100);
   
   const moveCardMutation = useMoveCard();
-  const snoozeEmailMutation = useSnoozeEmail();
   const unsnoozeEmailMutation = useUnsnoozeEmail();
 
   // Combine all emails from different folders for Kanban view
