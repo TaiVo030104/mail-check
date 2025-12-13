@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // import { ThemeToggle } from '@/components/theme-toggle';
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ComposeDialog } from "@/components/pages/emails/compose-dialog";
+import { EmailBulkActions } from "@/components/pages/emails/email-bulk-actions";
 import { EmailDetail } from "@/components/pages/emails/email-detail";
-import { EmailFilterValues } from "@/components/pages/emails/email-filters";
-import { EmailKanban } from "@/components/pages/emails/email-kanban";
+import { EmailFilters, EmailFilterValues } from "@/components/pages/emails/email-filters";
+import { EmailKanbanRefactored } from "@/components/pages/emails/email-kanban-refactored";
 import { EmailList } from "@/components/pages/emails/email-list";
 import { KeyboardShortcutsHelp } from "@/components/pages/emails/keyboard-shortcuts-help";
 import { MailboxSidebar } from "@/components/pages/emails/mailbox-sidebar";
@@ -29,6 +30,10 @@ import {
   useMarkAsRead,
   useSeedMockEmails,
   useToggleStar,
+  useBulkDelete,
+  useBulkMarkAsRead,
+  useBulkToggleStar,
+  useSelectAllEmailIds,
 } from "@/hooks/react-query/useEmails";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useRole";
@@ -40,13 +45,15 @@ export const Route = createFileRoute("/_authenticated/inbox")({
 function InboxPage() {
   const [selectedFolder, setSelectedFolder] = useState("inbox");
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
+  const [allMatchingCount, setAllMatchingCount] = useState<number | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [filters, _] = useState<EmailFilterValues>({});
+  const [filters, setFilters] = useState<EmailFilterValues>({ sort: "newest" });
   const [viewMode, setViewMode] = useState<"email" | "kanban">("email");
   const { refetch: refetchMailboxes } = useMailboxes();
   const { refetch: refetchEmails } = useEmailsByFolder(
@@ -61,8 +68,16 @@ function InboxPage() {
   const toggleStarMutation = useToggleStar();
   const deleteEmailMutation = useDeleteEmail();
   const seedEmailsMutation = useSeedMockEmails();
+  const bulkDeleteMutation = useBulkDelete();
+  const bulkMarkAsReadMutation = useBulkMarkAsRead();
+  const bulkToggleStarMutation = useBulkToggleStar();
+  const selectAllIdsMutation = useSelectAllEmailIds();
   const userRole = useUserRole();
   const { toast } = useToast();
+  const selectedIdsSet = useMemo(() => new Set(selectedEmailIds), [selectedEmailIds]);
+  const isAllMatchingSelected = Boolean(
+    allMatchingCount !== null && allMatchingCount > 0 && selectedEmailIds.length >= allMatchingCount,
+  );
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -143,15 +158,19 @@ function InboxPage() {
     refetchEmails();
   };
 
-  // const handleFiltersChange = (newFilters: EmailFilterValues) => {
-  //   setFilters(newFilters);
-  //   setCurrentPage(1); // Reset to first page when filters change
-  // };
+  const handleFiltersChange = (newFilters: EmailFilterValues) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+    setSelectedEmailIds([]);
+    setAllMatchingCount(null);
+  };
 
-  // const handleClearFilters = () => {
-  //   setFilters({});
-  //   setCurrentPage(1);
-  // };
+  const handleClearFilters = () => {
+    setFilters({ sort: "newest" });
+    setCurrentPage(1);
+    setSelectedEmailIds([]);
+    setAllMatchingCount(null);
+  };
 
   const handleSelectEmail = (emailId: string) => {
     // Mark as read immediately with optimistic update
@@ -164,6 +183,106 @@ function InboxPage() {
     setSelectedEmailId(null);
     setIsMobileDetailView(false);
   };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    setSelectedEmailIds([]);
+    setAllMatchingCount(null);
+  };
+
+  const handleToggleEmailSelection = (emailId: string) => {
+    setAllMatchingCount(null);
+    setSelectedEmailIds((prev) =>
+      prev.includes(emailId) ? prev.filter((id) => id !== emailId) : [...prev, emailId],
+    );
+  };
+
+  const handleSelectPageEmails = (emailIds: string[], select: boolean) => {
+    setAllMatchingCount(null);
+    setSelectedEmailIds((prev) => {
+      const next = new Set(prev);
+      emailIds.forEach((id) => {
+        if (select) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      });
+      return Array.from(next);
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedEmailIds([]);
+    setAllMatchingCount(null);
+  };
+
+  const handleSelectAllMatching = () => {
+    if (selectAllIdsMutation.isPending) return;
+    selectAllIdsMutation.mutate(
+      { folder: selectedFolder, filters },
+      {
+        onSuccess: ({ emailIds, total }) => {
+          setSelectedEmailIds(emailIds);
+          setAllMatchingCount(total);
+          if (selectedEmailId && !emailIds.includes(selectedEmailId)) {
+            handleCloseDetail();
+          }
+        },
+      },
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedEmailIds.length === 0 || bulkDeleteMutation.isPending) return;
+    bulkDeleteMutation.mutate(selectedEmailIds, {
+      onSuccess: () => {
+        if (selectedEmailId && selectedIdsSet.has(selectedEmailId)) {
+          handleCloseDetail();
+        }
+        clearSelection();
+      },
+    });
+  };
+
+  const handleBulkMarkRead = (isRead: boolean) => {
+    if (selectedEmailIds.length === 0 || bulkMarkAsReadMutation.isPending) return;
+    bulkMarkAsReadMutation.mutate(
+      {
+        emailIds: selectedEmailIds,
+        isRead,
+      },
+      {
+        onSuccess: () => {
+          clearSelection();
+        },
+      },
+    );
+  };
+
+  const handleBulkStar = (star: boolean) => {
+    if (selectedEmailIds.length === 0 || bulkToggleStarMutation.isPending) return;
+    bulkToggleStarMutation.mutate(
+      {
+        emailIds: selectedEmailIds,
+        star,
+      },
+      {
+        onSuccess: () => {
+          clearSelection();
+        },
+      },
+    );
+  };
+
+  const handleDetailDelete = () => {
+    if (selectedEmailId) {
+      setSelectedEmailIds((prev) => prev.filter((id) => id !== selectedEmailId));
+    }
+    setAllMatchingCount(null);
+    handleCloseDetail();
+  };
+
 
   const handleLogout = () => {
     signOutMutation.mutate();
@@ -326,7 +445,7 @@ function InboxPage() {
       <main className="flex flex-1 overflow-hidden" role="main">
         {viewMode === "kanban" ? (
           <div className="flex w-full flex-1 overflow-hidden p-4">
-            <EmailKanban onBackToEmail={() => setViewMode("email")} />
+            <EmailKanbanRefactored onBackToEmail={() => setViewMode("email")} />
           </div>
         ) : (
           <>
@@ -371,6 +490,8 @@ function InboxPage() {
                   setIsMobileDetailView(false);
                   setIsMobileSidebarOpen(false);
                   setCurrentPage(1);
+                  setSelectedEmailIds([]);
+                  setAllMatchingCount(null);
                 }}
               />
             </nav>
@@ -397,6 +518,23 @@ function InboxPage() {
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col">
+                  <EmailFilters
+                    filters={filters}
+                    onFiltersChange={handleFiltersChange}
+                    onClearFilters={handleClearFilters}
+                  />
+                  <EmailBulkActions
+                    selectedCount={selectedEmailIds.length}
+                    onClearSelection={clearSelection}
+                    onDeleteSelected={handleBulkDelete}
+                    onMarkRead={() => handleBulkMarkRead(true)}
+                    onMarkUnread={() => handleBulkMarkRead(false)}
+                    onStarSelected={() => handleBulkStar(true)}
+                    onUnstarSelected={() => handleBulkStar(false)}
+                    isDeleting={bulkDeleteMutation.isPending}
+                    isMarking={bulkMarkAsReadMutation.isPending}
+                    isStarring={bulkToggleStarMutation.isPending}
+                  />
                   <EmailList
                     folder={selectedFolder}
                     selectedEmailId={selectedEmailId}
@@ -404,11 +542,20 @@ function InboxPage() {
                     page={currentPage}
                     pageSize={pageSize}
                     filters={filters}
-                    onPageChange={setCurrentPage}
+                    onPageChange={handlePageChange}
                     onPageSizeChange={(size) => {
                       setPageSize(size);
                       setCurrentPage(1);
+                      setSelectedEmailIds([]);
+                      setAllMatchingCount(null);
                     }}
+                    selectedEmailIds={selectedEmailIds}
+                    onToggleEmailSelection={handleToggleEmailSelection}
+                    onSelectPageEmails={handleSelectPageEmails}
+                    onSelectAllMatching={handleSelectAllMatching}
+                    isAllMatchingSelected={isAllMatchingSelected}
+                    isSelectAllLoading={selectAllIdsMutation.isPending}
+                    allMatchingCount={allMatchingCount}
                   />
                 </div>
               </section>
@@ -426,16 +573,14 @@ function InboxPage() {
                   <EmailDetail
                     emailId={selectedEmailId}
                     onClose={handleCloseDetail}
-                    onDelete={handleCloseDetail}
+                    onDelete={handleDetailDelete}
                     onBack={handleCloseDetail}
                   />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Mail className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
-                      <p className="text-lg font-medium">No email selected</p>
-                      <p className="text-sm">Select an email from the list to view its contents</p>
-                    </div>
+                  <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
+                    <Mail className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
+                    <p className="text-lg font-medium">No email selected</p>
+                    <p className="text-sm">Select an email from the list to view its contents</p>
                   </div>
                 )}
               </article>

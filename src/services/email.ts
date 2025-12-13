@@ -36,6 +36,9 @@ export interface Email {
   sentAt: string;
   folder: string;
   attachments?: Attachment[];
+  hasAttachments?: boolean;
+  labels?: string[];
+  priority?: 'high' | 'normal' | 'low';
   isSnoozed?: boolean;
   snoozeUntil?: string;
   snoozedAt?: string;
@@ -57,6 +60,11 @@ export interface EmailListResponse {
   totalPages: number;
   nextPageToken?: string;
   hasMore: boolean;
+}
+
+export interface EmailSelectionResponse {
+  emailIds: string[];
+  total: number;
 }
 
 export interface SendEmailDto {
@@ -86,6 +94,8 @@ export interface EmailFilters {
   starred?: boolean;
   startDate?: Date;
   endDate?: Date;
+  hasAttachments?: boolean;
+  sort?: 'newest' | 'oldest';
 }
 
 export const emailService = {
@@ -109,9 +119,32 @@ export const emailService = {
       if (filters.starred !== undefined) params.starred = filters.starred;
       if (filters.startDate) params.startDate = filters.startDate.toISOString();
       if (filters.endDate) params.endDate = filters.endDate.toISOString();
+      if (filters.hasAttachments !== undefined) params.hasAttachments = filters.hasAttachments;
+      if (filters.sort) params.sort = filters.sort;
     }
     
     const response = await api.get(`emails/folder/${folder}`, { params });
+    return response.data;
+  },
+
+  async getEmailSelection(
+    folder: string,
+    filters?: EmailFilters,
+  ): Promise<EmailSelectionResponse> {
+    const params: any = {};
+
+    if (filters) {
+      if (filters.search) params.search = filters.search;
+      if (filters.from) params.from = filters.from;
+      if (filters.unread !== undefined) params.unread = filters.unread;
+      if (filters.starred !== undefined) params.starred = filters.starred;
+      if (filters.startDate) params.startDate = filters.startDate.toISOString();
+      if (filters.endDate) params.endDate = filters.endDate.toISOString();
+      if (filters.hasAttachments !== undefined) params.hasAttachments = filters.hasAttachments;
+      if (filters.sort) params.sort = filters.sort;
+    }
+
+    const response = await api.get(`emails/folder/${folder}/ids`, { params });
     return response.data;
   },
 
@@ -223,6 +256,11 @@ export const emailService = {
 
   async bulkMarkAsRead(emailIds: string[], isRead: boolean): Promise<{ message: string; modified: number }> {
     const response = await api.post('emails/bulk/read', { emailIds, isRead });
+    return response.data;
+  },
+
+  async updateEmailLabels(emailId: string, labels: string[]): Promise<{ message: string; labels: string[] }> {
+    const response = await api.put(`emails/${emailId}/labels`, { labels });
     return response.data;
   },
 

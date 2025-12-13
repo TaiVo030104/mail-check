@@ -35,11 +35,21 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
   const unsnoozeEmailMutation = useUnsnoozeEmail();
 
   // Combine all emails from different folders for Kanban view
-  const allEmails = [
-    ...(inboxData?.emails || []),
+  // Deduplicate by email ID, prioritizing snoozed emails (most up-to-date status)
+  const emailMap = new Map<string, Email>();
+  
+  // Add in order of priority: snoozed (most up-to-date) -> archived -> inbox
+  [
     ...(snoozedData?.emails || []),
     ...(archivedData?.emails || []),
-  ];
+    ...(inboxData?.emails || []),
+  ].forEach(email => {
+    if (!emailMap.has(email.id)) {
+      emailMap.set(email.id, email);
+    }
+  });
+  
+  const allEmails = Array.from(emailMap.values());
 
   // State for snooze dialog
   const [pendingSnooze, setPendingSnooze] = useState<{
@@ -92,11 +102,10 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
   };
 
   const handleSnoozeSuccess = async () => {
-    // After snooze is successful, move the card to Snoozed column
+    // Backend snooze API updates email, but we still need to update board columns
     if (pendingSnooze) {
-      console.log('[Kanban] Moving email to Snoozed:', pendingSnooze.emailId);
-      
-      return new Promise<void>((resolve) => {
+      // Move card in board from source column to snoozed column
+      await new Promise<void>((resolve) => {
         moveCardMutation.mutate(
           {
             emailId: pendingSnooze.emailId,
@@ -106,28 +115,32 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
           },
           {
             onSuccess: async () => {
-              console.log('[Kanban] Card moved successfully, refetching...');
-              // Wait a bit for backend to process
-              await new Promise(r => setTimeout(r, 500));
-              // Refetch after move is complete
+              // Refetch after board update
               await Promise.all([
                 refetchBoard(),
                 refetchInbox(),
                 refetchSnoozed(),
                 refetchArchived(),
               ]);
-              console.log('[Kanban] Refetch complete');
               setPendingSnooze(null);
               resolve();
             },
-            onError: (error) => {
-              console.error('[Kanban] Move card failed:', error);
+            onError: async () => {
+              // Even if move fails, still refetch
+              await Promise.all([
+                refetchBoard(),
+                refetchInbox(),
+                refetchSnoozed(),
+                refetchArchived(),
+              ]);
+              setPendingSnooze(null);
               resolve();
             },
           }
         );
       });
     } else {
+      // If no pending snooze (direct snooze from email detail), just refetch
       await Promise.all([
         refetchBoard(),
         refetchInbox(),
@@ -223,26 +236,30 @@ function KanbanColumn({ column, emailToColumnMap, allInboxEmails, onMoveEmail }:
   
   if (column.id === 'inbox') {
     // Inbox column: show ALL emails that haven't been moved to other columns
-    // This is the default entry point for all new emails
+    // Exclude snoozed emails (they should only appear in Snoozed column)
     displayEmails = allInboxEmails.filter(email => {
+      // Priority 1: Always exclude snoozed emails from inbox
+      if (email.isSnoozed || email.snoozeUntil) return false;
+      
       const assignedColumn = emailToColumnMap.get(email.id);
       // Show if: not assigned to any column OR explicitly in inbox column
       return !assignedColumn || assignedColumn === 'inbox';
     });
+  } else if (column.id === 'snoozed') {
+    // Snoozed column: Priority check for snooze status over board mapping
+    displayEmails = allInboxEmails.filter(e => {
+      // Always show if email has snooze status, regardless of board mapping
+      return e.isSnoozed || e.snoozeUntil;
+    });
   } else {
-    // Other columns (including Snoozed): show only explicitly assigned emails based on cards from backend
+    // Other columns: show only explicitly assigned emails, but exclude snoozed
     const emailIds = column.cards.map(card => card.emailId);
-    displayEmails = allInboxEmails.filter(e => emailIds.includes(e.id));
-    
-    if (column.id === 'snoozed') {
-      console.log('[Kanban] Snoozed column data:', {
-        columnCards: column.cards,
-        emailIds,
-        allInboxEmailsCount: allInboxEmails.length,
-        displayEmailsCount: displayEmails.length,
-        displayEmails: displayEmails.map(e => ({ id: e.id, subject: e.subject })),
-      });
-    }
+    displayEmails = allInboxEmails.filter(e => {
+      // Priority 1: Never show snoozed emails in non-snoozed columns
+      if (e.isSnoozed || e.snoozeUntil) return false;
+      // Priority 2: Check board mapping
+      return emailIds.includes(e.id);
+    });
   }
 
   const [{ isOver, canDrop }, drop] = useDrop(
