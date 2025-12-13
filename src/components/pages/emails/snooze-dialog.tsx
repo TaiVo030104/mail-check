@@ -12,9 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { emailService } from '@/services/email';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SnoozeDialogProps {
   emailId: string;
@@ -32,36 +32,72 @@ export function SnoozeDialog({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState('09:00');
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const snoozePresets = [
-    {
-      label: 'Chiều nay (6 PM)',
-      preset: 'later_today',
-    },
-    {
-      label: 'Ngày mai (9 AM)',
-      preset: 'tomorrow',
-    },
-    {
-      label: 'Cuối tuần (Thứ 7 9 AM)',
-      preset: 'this_weekend',
-    },
-    {
-      label: 'Tuần sau (Thứ 2 9 AM)',
-      preset: 'next_week',
-    },
-  ];
+  // Dynamic labels based on current time
+  const getSnoozePresets = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Calculate "Later today" or "Tomorrow morning"
+    const laterTodayLabel = currentHour < 15 
+      ? 'Later today (6 PM)' 
+      : 'Tomorrow morning (9 AM)';
+
+    // Calculate weekend label
+    let weekendLabel = 'This weekend (Sat 9 AM)';
+    if (currentDay === 6 || currentDay === 0 || (currentDay === 5 && currentHour >= 15)) {
+      weekendLabel = 'Next weekend (Sat 9 AM)';
+    }
+
+    // Calculate next Monday date
+    const nextMonday = new Date(now);
+    const daysUntilNextMonday = ((8 - now.getDay()) % 7) || 7;
+    nextMonday.setDate(nextMonday.getDate() + daysUntilNextMonday);
+    const nextMondayFormatted = nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    return [
+      {
+        label: laterTodayLabel,
+        preset: 'later_today',
+      },
+      {
+        label: 'Tomorrow (9 AM)',
+        preset: 'tomorrow',
+      },
+      {
+        label: weekendLabel,
+        preset: 'this_weekend',
+      },
+      {
+        label: `Next week (Mon ${nextMondayFormatted}, 9 AM)`,
+        preset: 'next_week',
+      },
+    ];
+  };
+
+  const snoozePresets = getSnoozePresets();
 
   const handlePresetSnooze = async (preset: string) => {
     setIsLoading(true);
     try {
+      console.log('[SnoozeDialog] Snoozing with preset:', preset);
       await emailService.snoozeEmailWithPreset(emailId, preset);
-      toast.success('Email đã được tạm hoãn!');
+      
+      // Wait for queries to be invalidated
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kanban'] }),
+        queryClient.invalidateQueries({ queryKey: ['emails'] }),
+      ]);
+      
+      console.log('[SnoozeDialog] Snooze successful');
+      toast.success('Email snoozed successfully!');
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      toast.error('Không thể tạm hoãn email. Vui lòng thử lại.');
-      console.error('Error snoozing email:', error);
+      console.error('[SnoozeDialog] Error snoozing email:', error);
+      toast.error('Failed to snooze email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +105,7 @@ export function SnoozeDialog({
 
   const handleCustomSnooze = async () => {
     if (!selectedDate) {
-      toast.error('Vui lòng chọn ngày');
+      toast.error('Please select a date');
       return;
     }
 
@@ -82,19 +118,28 @@ export function SnoozeDialog({
 
       // Check if date is in the future
       if (snoozeDate <= new Date()) {
-        toast.error('Thời gian tạm hoãn phải ở tương lai');
+        toast.error('Snooze time must be in the future');
         return;
       }
 
+      console.log('[SnoozeDialog] Snoozing with custom date:', snoozeDate.toISOString());
       await emailService.snoozeEmail(emailId, snoozeDate.toISOString());
+      
+      // Wait for queries to be invalidated
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kanban'] }),
+        queryClient.invalidateQueries({ queryKey: ['emails'] }),
+      ]);
+      
+      console.log('[SnoozeDialog] Snooze successful');
       toast.success(
-        `Email sẽ quay lại vào ${format(snoozeDate, 'dd/MM/yyyy HH:mm', { locale: vi })}`
+        `Email will return on ${format(snoozeDate, 'dd/MM/yyyy HH:mm')}`
       );
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      toast.error('Không thể tạm hoãn email. Vui lòng thử lại.');
-      console.error('Error snoozing email:', error);
+      console.error('[SnoozeDialog] Error snoozing email:', error);
+      toast.error('Failed to snooze email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -106,17 +151,17 @@ export function SnoozeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Tạm hoãn Email
+            Snooze Email
           </DialogTitle>
           <DialogDescription>
-            Chọn thời gian để email này quay lại hộp thư đến của bạn
+            Choose when this email should return to your inbox
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Preset options */}
           <div className="space-y-2">
-            <Label>Lựa chọn nhanh</Label>
+            <Label>Quick options</Label>
             <div className="grid grid-cols-2 gap-2">
               {snoozePresets.map((preset) => (
                 <Button
@@ -138,7 +183,7 @@ export function SnoozeDialog({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Hoặc chọn thời gian tùy chỉnh
+                Or pick a custom time
               </span>
             </div>
           </div>
@@ -148,7 +193,7 @@ export function SnoozeDialog({
             <div className="space-y-2">
               <Label htmlFor="custom-date" className="flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
-                Chọn ngày
+                Select date
               </Label>
               <Calendar
                 mode="single"
@@ -162,7 +207,7 @@ export function SnoozeDialog({
             <div className="space-y-2">
               <Label htmlFor="custom-time" className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Chọn giờ
+                Select time
               </Label>
               <Input
                 id="custom-time"
@@ -178,7 +223,7 @@ export function SnoozeDialog({
               disabled={isLoading || !selectedDate}
               className="w-full"
             >
-              {isLoading ? 'Đang xử lý...' : 'Tạm hoãn đến thời gian này'}
+              {isLoading ? 'Processing...' : 'Snooze until this time'}
             </Button>
           </div>
         </div>

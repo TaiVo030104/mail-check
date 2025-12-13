@@ -309,3 +309,54 @@ export function useBulkMarkAsRead() {
     },
   });
 }
+
+export function useSnoozeEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ emailId, snoozeUntil }: { emailId: string; snoozeUntil: string }) =>
+      emailService.snoozeEmail(emailId, snoozeUntil),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast({
+        title: 'Email snoozed',
+        description: 'Email has been snoozed successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to snooze email',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useUnsnoozeEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (emailId: string) => emailService.unsnoozeEmail(emailId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast({
+        title: 'Email unsnoozed',
+        description: 'Email has been restored to inbox',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to unsnooze email',
+        variant: 'destructive',
+      });
+    },
+  });
+}

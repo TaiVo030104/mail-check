@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
+import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
 import { useEffect, useState } from "react";
 
 // import { ThemeToggle } from '@/components/theme-toggle';
@@ -27,6 +27,7 @@ import {
   useEmailsByFolder,
   useMailboxes,
   useMarkAsRead,
+  useSeedMockEmails,
   useToggleStar,
 } from "@/hooks/react-query/useEmails";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,7 @@ function InboxPage() {
   const markAsReadMutation = useMarkAsRead();
   const toggleStarMutation = useToggleStar();
   const deleteEmailMutation = useDeleteEmail();
+  const seedEmailsMutation = useSeedMockEmails();
   const userRole = useUserRole();
   const { toast } = useToast();
 
@@ -165,6 +167,10 @@ function InboxPage() {
 
   const handleLogout = () => {
     signOutMutation.mutate();
+  };
+
+  const handleSeedEmails = () => {
+    seedEmailsMutation.mutate();
   };
 
   return (
@@ -285,6 +291,14 @@ function InboxPage() {
                 </span>
                 Keyboard Shortcuts
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleSeedEmails}
+                disabled={seedEmailsMutation.isPending}
+                className="cursor-pointer"
+              >
+                <Database className="mr-2 h-4 w-4" />
+                {seedEmailsMutation.isPending ? "Seeding..." : "Seed Mock Emails"}
+              </DropdownMenuItem>
               {userRole === "admin" && (
                 <DropdownMenuItem
                   onClick={() => (window.location.href = "/admin")}
@@ -331,7 +345,7 @@ function InboxPage() {
                 isMobileDetailView
                   ? "hidden md:block"
                   : isMobileSidebarOpen
-                    ? "fixed bottom-0 left-0 top-14 z-50 md:relative md:top-0"
+                    ? "fixed bottom-0 left-0 top-14 z-50 shadow-2xl md:relative md:top-0 md:shadow-none"
                     : "hidden md:block"
               }`}
               aria-label="Mailbox folders"
@@ -365,8 +379,8 @@ function InboxPage() {
             <ErrorBoundary onReset={() => setSelectedFolder(selectedFolder)}>
               <section
                 className={`flex h-full w-full flex-shrink-0 flex-col border-r bg-background md:w-[40%] ${
-                  isMobileDetailView ? "hidden md:flex" : "flex"
-                }`}
+                  isMobileDetailView ? "hidden" : "flex"
+                } md:flex`}
                 aria-label="Email list"
               >
                 <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/30 px-3 py-2.5 md:px-4 md:py-3">
@@ -403,7 +417,9 @@ function InboxPage() {
             {/* Column 3: Email Detail - 40% width on desktop */}
             <ErrorBoundary onReset={() => setSelectedEmailId(null)}>
               <article
-                className={`flex-1 bg-background ${isMobileDetailView ? "block" : "hidden md:block"}`}
+                className={`h-full flex-1 overflow-hidden bg-background ${
+                  isMobileDetailView ? "flex w-full" : "hidden"
+                } md:flex md:w-auto`}
                 aria-label="Email detail"
               >
                 {selectedEmailId ? (

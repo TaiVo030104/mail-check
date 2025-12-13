@@ -181,12 +181,12 @@ export const emailService = {
   },
 
   async downloadAttachment(attachmentId: string, filename: string, emailId?: string): Promise<void> {
-    // Determine endpoint based on whether it's a Gmail attachment or database/S3 attachment
-    const endpoint = emailId 
-      ? `emails/attachments/gmail/${emailId}/${attachmentId}/download`
-      : `emails/attachments/${attachmentId}/download`;
+    // Unified endpoint - backend will determine if it's from provider (Gmail) or database/S3
+    const params = emailId ? { emailId } : {};
+    const endpoint = `emails/attachments/${attachmentId}/download`;
       
     const response = await api.get(endpoint, {
+      params,
       responseType: 'blob',
     });
     

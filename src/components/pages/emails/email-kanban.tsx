@@ -2,50 +2,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useEmailsByFolder } from "@/hooks/react-query/useEmails";
+import { useEmailsByFolder, useSnoozeEmail, useUnsnoozeEmail } from "@/hooks/react-query/useEmails";
+import { useKanbanBoard, useMoveCard } from "@/hooks/react-query/useKanban";
 import { Email } from "@/services/email";
 import { format } from "date-fns";
-import { Loader2, MoveRight, RefreshCcw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Loader2, RefreshCcw } from "lucide-react";
+import { useState } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { SnoozeDialog } from "./snooze-dialog";
 
-type KanbanColumnId = "inbox" | "todo" | "in-progress" | "in-review" | "done";
-
-const KANBAN_COLUMNS: { id: KanbanColumnId; title: string; description?: string }[] = [
-  { id: "inbox", title: "Inbox", description: "New / triage" },
-  { id: "todo", title: "To Do", description: "Planned tasks" },
-  { id: "in-progress", title: "In Progress", description: "Being worked on" },
-  { id: "in-review", title: "In Review", description: "Waiting for review" },
-  { id: "done", title: "Done", description: "Completed" },
-];
-
-const STORAGE_KEY = "email-kanban-board";
 const DND_TYPE = "EMAIL_CARD";
-
-type KanbanBoardState = Record<KanbanColumnId, Email[]>;
 
 interface DragItem {
   id: string;
-  from: KanbanColumnId;
-}
-
-function loadBoardFromStorage(): KanbanBoardState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as KanbanBoardState;
-  } catch {
-    return null;
-  }
-}
-
-function saveBoardToStorage(board: KanbanBoardState) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
-  } catch {
-    // ignore
-  }
+  from: string;
 }
 
 interface EmailKanbanProps {
@@ -53,68 +24,128 @@ interface EmailKanbanProps {
 }
 
 export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
-  const { data, isLoading, refetch } = useEmailsByFolder("inbox", 1, 100);
-  const [board, setBoard] = useState<KanbanBoardState | null>(null);
+  const { data: boardData, isLoading: isBoardLoading, refetch: refetchBoard } = useKanbanBoard();
+  
+  // Fetch emails from multiple folders for Kanban view
+  const { data: inboxData, refetch: refetchInbox } = useEmailsByFolder("inbox", 1, 100);
+  const { data: snoozedData, refetch: refetchSnoozed } = useEmailsByFolder("snoozed", 1, 100);
+  const { data: archivedData, refetch: refetchArchived } = useEmailsByFolder("archive", 1, 100);
+  
+  const moveCardMutation = useMoveCard();
+  const snoozeEmailMutation = useSnoozeEmail();
+  const unsnoozeEmailMutation = useUnsnoozeEmail();
 
-  const inboxEmails = useMemo(() => data?.emails ?? [], [data]);
+  // Combine all emails from different folders for Kanban view
+  const allEmails = [
+    ...(inboxData?.emails || []),
+    ...(snoozedData?.emails || []),
+    ...(archivedData?.emails || []),
+  ];
 
-  // Initialize board from storage or inbox fetch (run once until board is set)
-  useEffect(() => {
-    if (board) return;
+  // State for snooze dialog
+  const [pendingSnooze, setPendingSnooze] = useState<{
+    emailId: string;
+    fromColumn: string;
+  } | null>(null);
 
-    const stored = loadBoardFromStorage();
-    if (stored) {
-      setBoard(stored);
-      return;
-    }
-
-    if (inboxEmails.length) {
-      const initial: KanbanBoardState = {
-        inbox: inboxEmails,
-        todo: [],
-        "in-progress": [],
-        "in-review": [],
-        done: [],
-      };
-      setBoard(initial);
-      saveBoardToStorage(initial);
-    }
-  }, [board, inboxEmails]);
-
-  // Persist board whenever it changes
-  useEffect(() => {
-    if (board) saveBoardToStorage(board);
-  }, [board]);
-
-  const moveEmail = (emailId: string, from: KanbanColumnId, to: KanbanColumnId) => {
-    if (!board || from === to) return;
-    setBoard((prev) => {
-      if (!prev) return prev;
-      const email = prev[from].find((e) => e.id === emailId);
-      if (!email) return prev;
-
-      return {
-        ...prev,
-        [from]: prev[from].filter((e) => e.id !== emailId),
-        [to]: [email, ...prev[to]],
-      };
+  // Note: Board auto-initializes on backend when first accessed
+  // 5 columns per requirements: Inbox, To Do, In Progress, Done, Snoozed
+  
+  // Build a map of which emails are in which columns
+  const emailToColumnMap = new Map<string, string>();
+  if (boardData) {
+    boardData.columns.forEach(col => {
+      col.cards.forEach(card => {
+        emailToColumnMap.set(card.emailId, col.id);
+      });
     });
+  }
+
+  const moveEmail = async (emailId: string, from: string, to: string) => {
+    if (from === to) return;
+    
+    // Special handling for Snoozed column
+    if (to === 'snoozed' && from !== 'snoozed') {
+      // Moving TO Snoozed column: show dialog to ask when to snooze
+      setPendingSnooze({ emailId, fromColumn: from });
+    } else if (from === 'snoozed' && to !== 'snoozed') {
+      // Moving FROM Snoozed column: unsnooze the email
+      unsnoozeEmailMutation.mutate(emailId, {
+        onSuccess: () => {
+          // After unsnoozing, move the card
+          moveCardMutation.mutate({
+            emailId,
+            fromColumn: from,
+            toColumn: to,
+            position: 0,
+          });
+        },
+      });
+    } else {
+      // Normal move between other columns
+      moveCardMutation.mutate({
+        emailId,
+        fromColumn: from,
+        toColumn: to,
+        position: 0,
+      });
+    }
   };
 
-  const resetBoard = () => {
-    if (!inboxEmails.length) return;
-    const fresh: KanbanBoardState = {
-      inbox: inboxEmails,
-      todo: [],
-      "in-progress": [],
-      "in-review": [],
-      done: [],
-    };
-    setBoard(fresh);
-    saveBoardToStorage(fresh);
+  const handleSnoozeSuccess = async () => {
+    // After snooze is successful, move the card to Snoozed column
+    if (pendingSnooze) {
+      console.log('[Kanban] Moving email to Snoozed:', pendingSnooze.emailId);
+      
+      return new Promise<void>((resolve) => {
+        moveCardMutation.mutate(
+          {
+            emailId: pendingSnooze.emailId,
+            fromColumn: pendingSnooze.fromColumn,
+            toColumn: 'snoozed',
+            position: 0,
+          },
+          {
+            onSuccess: async () => {
+              console.log('[Kanban] Card moved successfully, refetching...');
+              // Wait a bit for backend to process
+              await new Promise(r => setTimeout(r, 500));
+              // Refetch after move is complete
+              await Promise.all([
+                refetchBoard(),
+                refetchInbox(),
+                refetchSnoozed(),
+                refetchArchived(),
+              ]);
+              console.log('[Kanban] Refetch complete');
+              setPendingSnooze(null);
+              resolve();
+            },
+            onError: (error) => {
+              console.error('[Kanban] Move card failed:', error);
+              resolve();
+            },
+          }
+        );
+      });
+    } else {
+      await Promise.all([
+        refetchBoard(),
+        refetchInbox(),
+        refetchSnoozed(),
+        refetchArchived(),
+      ]);
+    }
   };
 
-  if (isLoading && !board) {
+  const handleRefresh = () => {
+    refetchBoard();
+    refetchInbox();
+    refetchSnoozed();
+    refetchArchived();
+  };
+
+  if (isBoardLoading || !boardData) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -126,19 +157,15 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Email Kanban</h2>
+          <h2 className="text-xl font-semibold">Email Kanban Board</h2>
           <p className="text-sm text-muted-foreground">
-            Drag and drop emails across columns to manage your workflow.
+            Drag emails between columns to organize your workflow. AI summaries help quick decisions! 🎯
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={moveCardMutation.isPending}>
             <RefreshCcw className="mr-2 size-4" />
-            Refresh inbox
-          </Button>
-          <Button variant="outline" size="sm" onClick={resetBoard}>
-            <MoveRight className="mr-2 size-4" />
-            Reset board
+            Refresh
           </Button>
           {onBackToEmail && (
             <Button size="sm" onClick={onBackToEmail}>
@@ -148,50 +175,90 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
         </div>
       </div>
 
-      {!board ? (
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
-          No data to display.
-        </div>
-      ) : (
-        <DndProvider backend={HTML5Backend}>
-          <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
-            {KANBAN_COLUMNS.map((col) => (
+      <DndProvider backend={HTML5Backend}>
+        <div className="grid h-full flex-1 grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {boardData.columns
+            .sort((a, b) => a.position - b.position)
+            .map((col) => (
               <KanbanColumn
                 key={col.id}
-                columnId={col.id}
-                title={col.title}
-                description={col.description}
-                emails={board[col.id]}
-                onDrop={(item) => moveEmail(item.id, item.from, col.id)}
+                column={col}
+                emailToColumnMap={emailToColumnMap}
+                allInboxEmails={allEmails}
+                onMoveEmail={moveEmail}
               />
             ))}
-          </div>
-        </DndProvider>
+        </div>
+      </DndProvider>
+
+      {pendingSnooze && (
+        <SnoozeDialog
+          emailId={pendingSnooze.emailId}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setPendingSnooze(null);
+          }}
+          onSuccess={handleSnoozeSuccess}
+        />
       )}
     </div>
   );
 }
 
 interface KanbanColumnProps {
-  columnId: KanbanColumnId;
-  title: string;
-  description?: string;
-  emails: Email[];
-  onDrop: (item: DragItem) => void;
+  column: {
+    id: string;
+    title: string;
+    description?: string;
+    color?: string;
+    cards: Array<{ emailId: string; position: number; emailProvider?: string }>;
+  };
+  emailToColumnMap: Map<string, string>;
+  allInboxEmails: Email[];
+  onMoveEmail: (emailId: string, from: string, to: string) => void;
 }
 
-function KanbanColumn({ columnId, title, description, emails, onDrop }: KanbanColumnProps) {
+function KanbanColumn({ column, emailToColumnMap, allInboxEmails, onMoveEmail }: KanbanColumnProps) {
+  // Get emails for this column
+  let displayEmails: Email[] = [];
+  
+  if (column.id === 'inbox') {
+    // Inbox column: show ALL emails that haven't been moved to other columns
+    // This is the default entry point for all new emails
+    displayEmails = allInboxEmails.filter(email => {
+      const assignedColumn = emailToColumnMap.get(email.id);
+      // Show if: not assigned to any column OR explicitly in inbox column
+      return !assignedColumn || assignedColumn === 'inbox';
+    });
+  } else {
+    // Other columns (including Snoozed): show only explicitly assigned emails based on cards from backend
+    const emailIds = column.cards.map(card => card.emailId);
+    displayEmails = allInboxEmails.filter(e => emailIds.includes(e.id));
+    
+    if (column.id === 'snoozed') {
+      console.log('[Kanban] Snoozed column data:', {
+        columnCards: column.cards,
+        emailIds,
+        allInboxEmailsCount: allInboxEmails.length,
+        displayEmailsCount: displayEmails.length,
+        displayEmails: displayEmails.map(e => ({ id: e.id, subject: e.subject })),
+      });
+    }
+  }
+
   const [{ isOver, canDrop }, drop] = useDrop(
     () => ({
       accept: DND_TYPE,
-      drop: (item: DragItem) => onDrop(item),
-      canDrop: (item: DragItem) => item.from !== columnId,
+      drop: (item: DragItem) => {
+        onMoveEmail(item.id, item.from, column.id);
+      },
+      canDrop: (item: DragItem) => item.from !== column.id,
       collect: (monitor) => ({
         isOver: monitor.isOver(),
         canDrop: monitor.canDrop(),
       }),
     }),
-    [columnId, onDrop]
+    [column.id, onMoveEmail]
   );
 
   const bgClass = isOver && canDrop ? "bg-primary/10 border-primary" : "bg-muted/40";
@@ -199,23 +266,27 @@ function KanbanColumn({ columnId, title, description, emails, onDrop }: KanbanCo
   return (
     <div
       ref={drop}
-      className={cn("flex min-h-[240px] flex-col rounded-lg border p-3 transition-colors", bgClass)}
+      className={cn(
+        "flex min-h-[400px] max-h-[calc(100vh-200px)] flex-col rounded-lg border p-2 transition-colors md:p-3",
+        "min-w-[280px] flex-shrink-0 md:min-w-0", // Mobile: fixed width with horizontal scroll, Desktop: flexible
+        bgClass
+      )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-          {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold">{column.title}</h3>
+          {column.description ? <p className="truncate text-xs text-muted-foreground">{column.description}</p> : null}
         </div>
-        <Badge variant="secondary">{emails.length}</Badge>
+        <Badge variant="secondary" className="flex-shrink-0">{displayEmails.length}</Badge>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2">
-        {emails.length === 0 ? (
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+        {displayEmails.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-background/40 p-4 text-xs text-muted-foreground">
             Drag emails here
           </div>
         ) : (
-          emails.map((email) => <KanbanCard key={email.id} columnId={columnId} email={email} />)
+          displayEmails.map((email) => <KanbanCard key={email.id} columnId={column.id} email={email} />)
         )}
       </div>
     </div>
@@ -223,7 +294,7 @@ function KanbanColumn({ columnId, title, description, emails, onDrop }: KanbanCo
 }
 
 interface KanbanCardProps {
-  columnId: KanbanColumnId;
+  columnId: string;
   email: Email;
 }
 
@@ -243,19 +314,31 @@ function KanbanCard({ columnId, email }: KanbanCardProps) {
     <Card
       ref={drag}
       className={cn(
-        "w-full cursor-move border bg-background p-3 shadow-sm transition-opacity will-change-transform",
+        "w-full cursor-move border bg-background p-2 shadow-sm transition-opacity will-change-transform md:p-3",
         isDragging ? "opacity-50" : "opacity-100"
       )}
     >
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="line-clamp-1 text-sm font-semibold">{email.subject}</span>
-        {email.isStarred ? <Badge variant="outline">★</Badge> : null}
+      <div className="mb-1 flex items-center justify-between gap-1 md:gap-2">
+        <span className="line-clamp-1 text-xs font-semibold md:text-sm">{email.subject}</span>
+        <div className="flex flex-shrink-0 items-center gap-0.5 md:gap-1">
+          {email.isStarred && <Badge variant="outline" className="h-4 px-1 text-xs md:h-5 md:px-2">★</Badge>}
+          {email.isSnoozed && (
+            <Badge variant="secondary" className="h-4 px-1 text-[10px] md:h-5 md:px-2 md:text-xs">
+              Snoozed
+            </Badge>
+          )}
+        </div>
       </div>
-      <p className="line-clamp-2 text-xs text-muted-foreground">{email.preview ?? ""}</p>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+      <p className="line-clamp-2 text-[11px] text-muted-foreground md:text-xs">{email.preview ?? ""}</p>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground md:mt-2 md:text-[11px]">
         <span className="line-clamp-1">From: {email.from}</span>
         <span>{format(new Date(email.sentAt), "dd/MM HH:mm")}</span>
       </div>
+      {email.isSnoozed && email.snoozeUntil && (
+        <div className="mt-1 text-[10px] text-orange-600">
+          Until: {format(new Date(email.snoozeUntil), "dd/MM HH:mm")}
+        </div>
+      )}
     </Card>
   );
 }
