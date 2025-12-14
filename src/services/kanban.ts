@@ -6,6 +6,7 @@ export interface KanbanColumn {
   description?: string;
   position: number;
   gmailLabel?: string;
+  label?: string;
   color?: string;
   isDefault: boolean;
   cards: KanbanCard[];
@@ -28,6 +29,7 @@ export interface CreateColumnDto {
   position?: number;
   gmailLabel?: string;
   color?: string;
+   label?: string;
 }
 
 export interface UpdateColumnDto {
@@ -36,6 +38,7 @@ export interface UpdateColumnDto {
   position?: number;
   gmailLabel?: string;
   color?: string;
+   label?: string;
 }
 
 export interface MoveCardDto {

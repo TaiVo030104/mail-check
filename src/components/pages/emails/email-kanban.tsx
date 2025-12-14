@@ -34,6 +34,8 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
   const moveCardMutation = useMoveCard();
   const unsnoozeEmailMutation = useUnsnoozeEmail();
 
+  const [sortBy, setSortBy] = useState<"date" | "sender">("date");
+
   // Combine all emails from different folders for Kanban view
   // Deduplicate by email ID, prioritizing snoozed emails (most up-to-date status)
   const emailMap = new Map<string, Email>();
@@ -175,6 +177,20 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={sortBy === "date" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSortBy("date")}
+          >
+            Sort by date
+          </Button>
+          <Button
+            variant={sortBy === "sender" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSortBy("sender")}
+          >
+            Sort by sender
+          </Button>
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={moveCardMutation.isPending}>
             <RefreshCcw className="mr-2 size-4" />
             Refresh
@@ -197,6 +213,7 @@ export function EmailKanban({ onBackToEmail }: EmailKanbanProps) {
                 column={col}
                 emailToColumnMap={emailToColumnMap}
                 allInboxEmails={allEmails}
+                sortBy={sortBy}
                 onMoveEmail={moveEmail}
               />
             ))}
@@ -227,10 +244,11 @@ interface KanbanColumnProps {
   };
   emailToColumnMap: Map<string, string>;
   allInboxEmails: Email[];
+  sortBy: "date" | "sender";
   onMoveEmail: (emailId: string, from: string, to: string) => void;
 }
 
-function KanbanColumn({ column, emailToColumnMap, allInboxEmails, onMoveEmail }: KanbanColumnProps) {
+function KanbanColumn({ column, emailToColumnMap, allInboxEmails, sortBy, onMoveEmail }: KanbanColumnProps) {
   // Get emails for this column
   let displayEmails: Email[] = [];
   
@@ -261,6 +279,19 @@ function KanbanColumn({ column, emailToColumnMap, allInboxEmails, onMoveEmail }:
       return emailIds.includes(e.id);
     });
   }
+
+  // Apply sorting
+  const sortedEmails = [...displayEmails].sort((a, b) => {
+    if (sortBy === "sender") {
+      const fromA = (a.from || "").toLowerCase();
+      const fromB = (b.from || "").toLowerCase();
+      return fromA.localeCompare(fromB);
+    }
+    // Default: sort by date (newest first)
+    const timeA = new Date(a.sentAt).getTime();
+    const timeB = new Date(b.sentAt).getTime();
+    return timeB - timeA;
+  });
 
   const [{ isOver, canDrop }, drop] = useDrop(
     () => ({
@@ -297,12 +328,12 @@ function KanbanColumn({ column, emailToColumnMap, allInboxEmails, onMoveEmail }:
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-        {displayEmails.length === 0 ? (
+        {sortedEmails.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-background/40 p-4 text-xs text-muted-foreground">
             Drag emails here
           </div>
         ) : (
-          displayEmails.map((email) => <KanbanCard key={email.id} columnId={column.id} email={email} />)
+          sortedEmails.map((email) => <KanbanCard key={email.id} columnId={column.id} email={email} />)
         )}
       </div>
     </div>

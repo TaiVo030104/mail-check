@@ -160,16 +160,18 @@ export const EmailList = memo(function EmailList({
 
       {/* Email List - scrollable area */}
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto" role="list">
-        {isLoading && <LoadingState message="Loading emails..." />}
-
-        {!isLoading && (!data || data.emails.length === 0) && (
-          <EmptyState 
-            title="No emails found" 
-            description="This folder is empty or no emails match your filters"
-          />
-        )}
-
-        {!isLoading && data && data.emails.length > 0 && (
+        {(isLoading || (!data || data.emails.length === 0)) ? (
+          <div className="flex h-full items-center justify-center py-8">
+            {isLoading ? (
+              <LoadingState message="Loading emails..." />
+            ) : (
+              <EmptyState
+                title="No emails found"
+                description="This folder is empty or no emails match your filters"
+              />
+            )}
+          </div>
+        ) : (
           <div
             style={{
               height: `${virtualizer.getTotalSize()}px`,

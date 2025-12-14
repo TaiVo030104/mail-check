@@ -26,7 +26,7 @@ export interface EmailFilterValues {
   startDate?: Date;
   endDate?: Date;
   hasAttachments?: boolean;
-  sort?: 'newest' | 'oldest';
+  sort?: 'newest' | 'oldest' | 'sender-asc' | 'sender-desc';
 }
 
 interface EmailFiltersProps {
@@ -73,7 +73,7 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
   const hasActiveFilters = activeFiltersCount > 0;
 
   return (
-    <div className="flex items-center gap-2 p-3 md:p-4 border-b bg-background">
+    <div className={cn('flex w-full items-center gap-2', 'px-2 md:px-4')}>
       {/* Search Input */}
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -245,19 +245,24 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
 
             {/* Sorting */}
             <div className="space-y-2">
-              <Label htmlFor="sort-order">Sort by date</Label>
+              <Label htmlFor="sort-order">Sort</Label>
               <Select
                 value={localFilters.sort || 'newest'}
-                onValueChange={(value: 'newest' | 'oldest') =>
-                  setLocalFilters({ ...localFilters, sort: value })
+                onValueChange={(value) =>
+                  setLocalFilters({
+                    ...localFilters,
+                    sort: value as EmailFilterValues['sort'],
+                  })
                 }
               >
                 <SelectTrigger id="sort-order">
                   <SelectValue placeholder="Select order" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Newest first</SelectItem>
-                  <SelectItem value="oldest">Oldest first</SelectItem>
+                  <SelectItem value="newest">Date: newest first</SelectItem>
+                  <SelectItem value="oldest">Date: oldest first</SelectItem>
+                  <SelectItem value="sender-asc">Sender: A–Z</SelectItem>
+                  <SelectItem value="sender-desc">Sender: Z–A</SelectItem>
                 </SelectContent>
               </Select>
             </div>

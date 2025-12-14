@@ -95,7 +95,7 @@ export interface EmailFilters {
   startDate?: Date;
   endDate?: Date;
   hasAttachments?: boolean;
-  sort?: 'newest' | 'oldest';
+  sort?: 'newest' | 'oldest' | 'sender-asc' | 'sender-desc';
 }
 
 export const emailService = {

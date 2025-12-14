@@ -299,7 +299,7 @@ function InboxPage() {
         className="flex h-14 items-center justify-between border-b bg-background px-3 md:h-16 md:px-4"
         role="banner"
       >
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex flex-1 items-center gap-2 md:gap-3 min-w-0">
           {/* Mobile menu toggle */}
           <Button
             variant="ghost"
@@ -329,6 +329,13 @@ function InboxPage() {
               Kanban
             </ToggleGroupItem>
           </ToggleGroup>
+          <div className="ml-2 flex-1">
+            <EmailFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onClearFilters={handleClearFilters}
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
@@ -445,7 +452,10 @@ function InboxPage() {
       <main className="flex flex-1 overflow-hidden" role="main">
         {viewMode === "kanban" ? (
           <div className="flex w-full flex-1 overflow-hidden p-4">
-            <EmailKanbanRefactored onBackToEmail={() => setViewMode("email")} />
+            <EmailKanbanRefactored
+              filters={filters}
+              onBackToEmail={() => setViewMode("email")}
+            />
           </div>
         ) : (
           <>
@@ -518,11 +528,6 @@ function InboxPage() {
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col">
-                  <EmailFilters
-                    filters={filters}
-                    onFiltersChange={handleFiltersChange}
-                    onClearFilters={handleClearFilters}
-                  />
                   <EmailBulkActions
                     selectedCount={selectedEmailIds.length}
                     onClearSelection={clearSelection}
@@ -564,8 +569,8 @@ function InboxPage() {
             {/* Column 3: Email Detail - 40% width on desktop */}
             <ErrorBoundary onReset={() => setSelectedEmailId(null)}>
               <article
-                className={`h-full flex-1 overflow-hidden bg-background ${
-                  isMobileDetailView ? "flex w-full" : "hidden"
+                className={`flex h-full flex-1 flex-col overflow-hidden bg-background ${
+                  isMobileDetailView ? "w-full" : "hidden"
                 } md:flex md:w-auto`}
                 aria-label="Email detail"
               >
@@ -577,7 +582,7 @@ function InboxPage() {
                     onBack={handleCloseDetail}
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
+                  <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground">
                     <Mail className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
                     <p className="text-lg font-medium">No email selected</p>
                     <p className="text-sm">Select an email from the list to view its contents</p>
