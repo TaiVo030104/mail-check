@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
+import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Search, Settings, Shield, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 // import { ThemeToggle } from '@/components/theme-toggle';
@@ -12,6 +12,9 @@ import { EmailKanbanRefactored } from "@/components/pages/emails/email-kanban-re
 import { EmailList } from "@/components/pages/emails/email-list";
 import { KeyboardShortcutsHelp } from "@/components/pages/emails/keyboard-shortcuts-help";
 import { MailboxSidebar } from "@/components/pages/emails/mailbox-sidebar";
+import { SmartSearchBar } from "@/components/pages/emails/smart-search-bar";
+import { SearchResultsView } from "@/components/pages/emails/search-results-view";
+import { useSearch } from "@/hooks/react-query/useSearch";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -55,6 +58,15 @@ function InboxPage() {
   const [pageSize, setPageSize] = useState(25);
   const [filters, setFilters] = useState<EmailFilterValues>({ sort: "newest" });
   const [viewMode, setViewMode] = useState<"email" | "kanban">("email");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  
+  // Search query
+  const {
+    data: searchResults,
+    isLoading: isSearchLoading,
+    error: searchError,
+  } = useSearch(searchQuery, selectedFolder, 50, true);
   const { refetch: refetchMailboxes } = useMailboxes();
   const { refetch: refetchEmails } = useEmailsByFolder(
     selectedFolder,
@@ -97,6 +109,18 @@ function InboxPage() {
           // Compose new email
           e.preventDefault();
           setIsComposeOpen(true);
+          break;
+        case "/":
+        case "k":
+          // Activate search (Cmd/Ctrl + K or just /)
+          if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            setIsSearchMode(true);
+            // Focus will be handled by SmartSearchBar
+          } else if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            setIsSearchMode(true);
+          }
           break;
         case "?":
           // Show keyboard shortcuts help
@@ -330,11 +354,46 @@ function InboxPage() {
             </ToggleGroupItem>
           </ToggleGroup>
           <div className="ml-2 flex-1">
-            <EmailFilters
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              onClearFilters={handleClearFilters}
-            />
+            {isSearchMode ? (
+              <SmartSearchBar
+                onSearch={(query) => {
+                  setSearchQuery(query);
+                  if (query.trim()) {
+                    setIsSearchMode(true);
+                  }
+                }}
+                onEmailClick={(email) => {
+                  setSelectedEmailId(email.id);
+                  setIsMobileDetailView(true);
+                  setIsSearchMode(false);
+                  setSearchQuery("");
+                }}
+                onClose={() => {
+                  setSearchQuery("");
+                  setIsSearchMode(false);
+                }}
+                initialQuery={searchQuery}
+                folder={selectedFolder}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <EmailFilters
+                  filters={filters}
+                  onFiltersChange={handleFiltersChange}
+                  onClearFilters={handleClearFilters}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsSearchMode(true)}
+                  className="h-9 gap-2"
+                  title="Search (Ctrl+K or /)"
+                >
+                  <Search className="h-4 w-4" />
+                  <span className="hidden md:inline">Search</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -450,7 +509,28 @@ function InboxPage() {
 
       {/* Main Content Area */}
       <main className="flex flex-1 overflow-hidden" role="main">
-        {viewMode === "kanban" ? (
+        {isSearchMode && searchQuery.trim() ? (
+          <div className="flex w-full flex-1 overflow-hidden">
+            <SearchResultsView
+              results={searchResults?.results || []}
+              query={searchQuery}
+              isLoading={isSearchLoading}
+              error={searchError as Error | null}
+              onBack={() => {
+                setSearchQuery("");
+                setIsSearchMode(false);
+              }}
+              onEmailClick={(email) => {
+                setSelectedEmailId(email.id);
+                setIsMobileDetailView(true);
+                setIsSearchMode(false);
+              }}
+              onToggleStar={(emailId, isStarred) => {
+                toggleStarMutation.mutate({ id: emailId, isStarred });
+              }}
+            />
+          </div>
+        ) : viewMode === "kanban" ? (
           <div className="flex w-full flex-1 overflow-hidden p-4">
             <EmailKanbanRefactored
               filters={filters}
