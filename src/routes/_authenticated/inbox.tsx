@@ -525,8 +525,8 @@ function InboxPage() {
                 setIsMobileDetailView(true);
                 setIsSearchMode(false);
               }}
-              onToggleStar={(emailId, isStarred) => {
-                toggleStarMutation.mutate({ id: emailId, isStarred });
+              onToggleStar={(emailId) => {
+                toggleStarMutation.mutate(emailId);
               }}
             />
           </div>

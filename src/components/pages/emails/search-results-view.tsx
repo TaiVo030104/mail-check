@@ -17,7 +17,7 @@ interface SearchResultsViewProps {
   error: Error | null;
   onBack: () => void;
   onEmailClick: (email: Email) => void;
-  onToggleStar?: (emailId: string, isStarred: boolean) => void;
+  onToggleStar?: (emailId: string) => void;
 }
 
 export function SearchResultsView({
@@ -46,7 +46,7 @@ export function SearchResultsView({
     });
 
     if (onToggleStar) {
-      onToggleStar(emailId, newStarred);
+      onToggleStar(emailId);
     }
   };
 
@@ -188,7 +188,7 @@ export function SearchResultsView({
               </CardHeader>
               <CardContent className="pt-0">
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                  {result.email.preview || result.email.body?.substring(0, 150) || 'No preview'}
+                  {result.email.preview || 'No preview'}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
