@@ -93,11 +93,12 @@
         state: enabled
       tags: setup
 
-    - name: Create web network if not exists
-      docker_network:
-        name: web
-        state: present
-      when: env_type == 'development'
+    # Configure Git authentication for private repositories
+    - name: Configure Git credential helper
+      shell: |
+        git config --global credential.helper store
+        echo "https://{{ github_user }}:{{ github_token }}@github.com" > ~/.git-credentials
+      when: github_user is defined and github_token is defined
       tags: [setup, deploy]
 
     # Clone Repositories
@@ -273,16 +274,11 @@
       register: ssl_cert
       tags: ssl
 
-    # Main Domain SSL (Standalone) - For dev environment main instance
-    - name: Stop nginx container for SSL setup (Main Domain)
-      shell: docker stop {{ app_name }}-nginx
-      ignore_errors: true
-      when: env_type == 'development' and app_name == 'dev' and not ssl_cert.stat.exists
-      tags: ssl
-
-    - name: Obtain SSL certificate (Main Domain - Standalone)
+    # Main Domain SSL (Webroot) - For dev environment main instance (sharing server with prod)
+    - name: Obtain SSL certificate (Main Domain - Webroot)
       shell: |
-        certbot certonly --standalone \
+        certbot certonly --webroot \
+          -w /var/www/certbot \
           -d {{ full_domain_name }} \
           --email {{ ssl_email }} \
           --agree-tos \
@@ -321,9 +317,28 @@
       tags: [config, ssl, deploy]
 
     # Deploy Application
+    - name: Create web network for Traefik (if not exists)
+      docker_network:
+        name: web
+        driver: bridge
+        state: present
+      tags: deploy
+
+    - name: Verify web network exists
+      shell: docker network ls | grep web
+      register: web_network_check
+      tags: deploy
+
+    - name: Display network info
+      debug:
+        var: web_network_check.stdout_lines
+      tags: deploy
+
     - name: Create shared Docker network (if not exists)
       docker_network:
         name: mail-app-network
+        driver: bridge
+        state: present
       tags: deploy
 
     - name: Log in to GitHub Container Registry
