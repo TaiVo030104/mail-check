@@ -1,0 +1,114 @@
+name: Cleanup Preview Environment
+
+on:
+  delete:
+    branches-ignore:
+      - main
+      - dev
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Preview app name to delete (e.g., preview-feature-x)'
+        required: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout DevOps Repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PREVIEW_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PREVIEW_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Determine preview name
+        id: preview
+        run: |
+          if [ "${{ github.event_name }}" == "delete" ]; then
+            BRANCH_NAME="${{ github.event.ref }}"
+            SANITIZED=$(echo "$BRANCH_NAME" | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')
+            APP_NAME="preview-$SANITIZED"
+          else
+            APP_NAME="${{ github.event.inputs.app_name }}"
+          fi
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Cleanup Playbook
+        run: |
+          cd ansible
+          cat > cleanup-preview.yml << 'EOF'
+          ---
+          - name: Cleanup Preview Environment
+            hosts: all
+            become: true
+            vars:
+              app_root: "/opt/{{ app_name }}"
+            
+            tasks:
+              - name: Stop and remove containers
+                shell: |
+                  cd {{ app_root }} 2>/dev/null || exit 0
+                  docker compose -p {{ app_name }} down --remove-orphans -v
+                ignore_errors: true
+              
+              - name: Remove application directory
+                file:
+                  path: "{{ app_root }}"
+                  state: absent
+              
+              - name: Remove Nginx config
+                file:
+                  path: "/etc/nginx/sites-enabled/{{ app_name }}.conf"
+                  state: absent
+                notify: Reload Nginx
+              
+              - name: Remove SSL certificate
+                shell: |
+                  certbot delete --cert-name {{ app_name }}.mail-dev.nguyenanhhao.site --non-interactive
+                ignore_errors: true
+              
+              - name: Clean up unused Docker resources
+                shell: |
+                  docker system prune -f
+                  docker volume prune -f
+                ignore_errors: true
+            
+            handlers:
+              - name: Reload Nginx
+                systemd:
+                  name: nginx
+                  state: reloaded
+          EOF
+
+      - name: Create Cleanup Inventory
+        run: |
+          cd ansible
+          cat > inventory-cleanup.ini << EOF
+          [preview]
+          preview_server ansible_host=${{ secrets.PREVIEW_SERVER_IP }} ansible_user=ubuntu
+          
+          [preview:vars]
+          ansible_ssh_private_key_file=~/.ssh/id_rsa
+          ansible_python_interpreter=/usr/bin/python3
+          app_name=${{ steps.preview.outputs.app_name }}
+          EOF
+
+      - name: Run Cleanup
+        run: |
+          cd ansible
+          ansible-playbook -i inventory-cleanup.ini cleanup-preview.yml
+
+      - name: Cleanup Summary
+        if: success()
+        run: |
+          echo "🗑️ Preview environment cleaned up!"
+          echo "📦 Removed: ${{ steps.preview.outputs.app_name }}"
