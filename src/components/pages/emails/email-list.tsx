@@ -51,7 +51,6 @@ export const EmailList = memo(function EmailList({
   
   // Use search results if provided, otherwise use folder emails
   const displayEmails = searchEmails || data?.emails || [];
-  const displayTotal = searchEmails ? searchEmails.length : data?.total || 0;
   
   const listRef = useRef<HTMLDivElement>(null);
   const pageEmailIds = displayEmails.map((email) => email.id) ?? [];

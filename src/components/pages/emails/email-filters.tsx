@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, X } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -266,19 +266,6 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Clear Search Button */}
-      {filters.search && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleSearchChange('')}
-          className="h-9 px-2"
-          aria-label="Clear search"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      )}
     </div>
   );
 }

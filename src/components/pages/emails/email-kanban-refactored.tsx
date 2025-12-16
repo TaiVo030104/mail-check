@@ -198,11 +198,6 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   const isLoading =
     isInboxLoading || isArchiveLoading || isSnoozedLoading || isBoardLoading || !boardData;
 
-  // Use search results if provided, otherwise use folder data
-  const displayInboxEmails = searchEmails || inboxData?.emails || [];
-  const displayArchiveEmails = searchEmails ? searchEmails.filter(e => e.folder === 'archive') : archiveData?.emails || [];
-  const displaySnoozedEmails = searchEmails ? searchEmails.filter(e => e.folder === 'snoozed') : snoozedData?.emails || [];
-
   useEffect(() => {
     if (!boardData?.columns) return;
 

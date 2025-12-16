@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Search, Settings, Shield, User } from "lucide-react";
+import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 // import { ThemeToggle } from '@/components/theme-toggle';
@@ -124,11 +124,9 @@ function InboxPage() {
           // Activate search (Cmd/Ctrl + K or just /)
           if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            setIsSearchMode(true);
             // Focus will be handled by SmartSearchBar
           } else if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
             e.preventDefault();
-            setIsSearchMode(true);
           }
           break;
         case "?":
