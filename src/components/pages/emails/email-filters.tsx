@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface EmailFilterValues {
-  search?: string;
   from?: string;
   unread?: boolean;
   starred?: boolean;
@@ -43,12 +42,6 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
     setLocalFilters(filters);
   }, [filters]);
 
-  const handleSearchChange = (value: string) => {
-    const updated = { ...localFilters, search: value || undefined };
-    setLocalFilters(updated);
-    onFiltersChange(updated);
-  };
-
   const handleApplyFilters = () => {
     onFiltersChange({ ...localFilters, sort: localFilters.sort || 'newest' });
     setIsOpen(false);
@@ -62,7 +55,6 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
 
   const activeFiltersCount = [
     filters.from,
-    filters.search,
     filters.unread ? true : undefined,
     filters.starred ? true : undefined,
     filters.startDate,
@@ -73,20 +65,7 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
   const hasActiveFilters = activeFiltersCount > 0;
 
   return (
-    <div className={cn('flex w-full items-center gap-2', 'px-2 md:px-4')}>
-      {/* Search Input */}
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search emails..."
-          value={localFilters.search || ''}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="pl-9 pr-4 h-9 w-full"
-          aria-label="Search emails"
-        />
-      </div>
-
+    <div className={cn('flex items-center gap-2')}>
       {/* Advanced Filters */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>

@@ -68,6 +68,7 @@ const DEFAULT_KANBAN_COLUMNS: KanbanColumn[] = [
 
 interface EmailKanbanProps {
   filters: EmailFilterValues;
+  searchEmails?: Email[]; // Search results from UnifiedSearchBar
   onBackToEmail?: () => void;
 }
 
@@ -162,7 +163,7 @@ function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanCo
   );
 }
 
-export function EmailKanbanRefactored({ filters, onBackToEmail }: EmailKanbanProps): JSX.Element {
+export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: EmailKanbanProps): JSX.Element {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [pendingSnooze, setPendingSnooze] = useState<{
     emailId: string;
@@ -197,6 +198,11 @@ export function EmailKanbanRefactored({ filters, onBackToEmail }: EmailKanbanPro
   const isLoading =
     isInboxLoading || isArchiveLoading || isSnoozedLoading || isBoardLoading || !boardData;
 
+  // Use search results if provided, otherwise use folder data
+  const displayInboxEmails = searchEmails || inboxData?.emails || [];
+  const displayArchiveEmails = searchEmails ? searchEmails.filter(e => e.folder === 'archive') : archiveData?.emails || [];
+  const displaySnoozedEmails = searchEmails ? searchEmails.filter(e => e.folder === 'snoozed') : snoozedData?.emails || [];
+
   useEffect(() => {
     if (!boardData?.columns) return;
 
@@ -216,7 +222,7 @@ export function EmailKanbanRefactored({ filters, onBackToEmail }: EmailKanbanPro
     setKanbanColumns(mapped);
   }, [boardData]);
 
-  const allEmails: Email[] = [
+  const allEmails: Email[] = searchEmails || [
     ...(inboxData?.emails || []),
     ...(archiveData?.emails || []),
     ...(snoozedData?.emails || []),

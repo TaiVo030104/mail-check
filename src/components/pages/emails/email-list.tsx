@@ -17,6 +17,7 @@ interface EmailListProps {
   page?: number;
   pageSize?: number;
   filters?: EmailFilterValues;
+  searchEmails?: any[]; // Search results from UnifiedSearchBar
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   selectedEmailIds?: string[];
@@ -35,6 +36,7 @@ export const EmailList = memo(function EmailList({
   page = 1,
   pageSize = 25,
   filters,
+  searchEmails,
   onPageChange,
   onPageSizeChange,
   selectedEmailIds = [],
@@ -46,15 +48,20 @@ export const EmailList = memo(function EmailList({
   allMatchingCount = null,
 }: EmailListProps) {
   const { data, isLoading } = useEmailsByFolder(folder, page, pageSize, filters);
+  
+  // Use search results if provided, otherwise use folder emails
+  const displayEmails = searchEmails || data?.emails || [];
+  const displayTotal = searchEmails ? searchEmails.length : data?.total || 0;
+  
   const listRef = useRef<HTMLDivElement>(null);
-  const pageEmailIds = data?.emails?.map((email) => email.id) ?? [];
+  const pageEmailIds = displayEmails.map((email) => email.id) ?? [];
   const selectedSet = useMemo(() => new Set(selectedEmailIds), [selectedEmailIds]);
   const allSelectedOnPage = pageEmailIds.length > 0 && pageEmailIds.every((id) => selectedSet.has(id));
   const someSelectedOnPage = !allSelectedOnPage && pageEmailIds.some((id) => selectedSet.has(id));
 
   // Setup virtual scrolling
   const virtualizer = useVirtualizer({
-    count: data?.emails.length || 0,
+    count: displayEmails.length || 0,
     getScrollElement: () => listRef.current,
     estimateSize: () => 88, // Approximate height of each email item
     overscan: 5, // Number of items to render above/below the visible area
@@ -180,7 +187,7 @@ export const EmailList = memo(function EmailList({
             }}
           >
             {virtualizer.getVirtualItems().map((virtualItem) => {
-              const email = data.emails[virtualItem.index];
+              const email = displayEmails[virtualItem.index];
               const isSelected = selectedEmailId === email.id;
               const isChecked = selectedSet.has(email.id);
 
