@@ -301,6 +301,18 @@
       when: github_user is defined and github_token is defined
       tags: [deploy]
 
+    - name: Prune unused Docker data (images, containers, networks)
+      shell: docker system prune -af
+      args:
+        warn: false
+      tags: [cleanup]
+
+    - name: Prune unused Docker volumes
+      shell: docker volume prune -f
+      args:
+        warn: false
+      tags: [cleanup]
+
     - name: Pull Docker images
       shell: docker compose pull
       args:
