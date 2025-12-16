@@ -146,6 +146,10 @@
         append: yes
       tags: [setup]
 
+    - name: Reset SSH connection for docker group to take effect
+      meta: reset_connection
+      tags: [setup]
+
     - name: Configure firewall
       ufw:
         rule: allow
@@ -289,26 +293,24 @@
     # 5. DOCKER DEPLOYMENT
     # ==========================================================================
     - name: Login to GitHub Container Registry
-      docker_login:
+      community.docker.docker_login:
         registry: ghcr.io
         username: "{{ github_user }}"
         password: "{{ github_token }}"
-      become_user: "{{ ansible_user }}"
-      when: github_user is defined
+        reauthorize: yes
+      when: github_user is defined and github_token is defined
       tags: [deploy]
 
     - name: Pull Docker images
       shell: docker compose pull
       args:
         chdir: "{{ app_root }}"
-      become_user: "{{ ansible_user }}"
       tags: [deploy]
 
     - name: Stop existing containers
       shell: docker compose -p {{ app_name }} down --remove-orphans
       args:
         chdir: "{{ app_root }}"
-      become_user: "{{ ansible_user }}"
       ignore_errors: true
       tags: [deploy]
 
@@ -316,7 +318,6 @@
       shell: docker compose -p {{ app_name }} up -d
       args:
         chdir: "{{ app_root }}"
-      become_user: "{{ ansible_user }}"
       tags: [deploy]
 
     - name: Wait for containers to be healthy
@@ -325,7 +326,63 @@
       tags: [deploy]
 
     # ==========================================================================
-    # 6. SSL CERTIFICATE
+    # 6. NGINX CONFIGURATION (HTTP ONLY - For SSL Challenge)
+    # ==========================================================================
+    - name: Create temporary HTTP-only Nginx config for SSL challenge
+      copy:
+        dest: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        mode: '0644'
+        content: |
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ full_domain }};
+          
+              # Certbot webroot for SSL challenges
+              location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+                  allow all;
+              }
+          
+              # Temporary proxy to frontend (for testing)
+              location / {
+                  proxy_pass http://127.0.0.1:{{ frontend_port }};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          
+              # API Backend proxy
+              location /api/ {
+                  proxy_pass http://127.0.0.1:{{ backend_port }}/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+      tags: [nginx, ssl]
+
+    - name: Enable Nginx site (temporary)
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}.conf"
+        state: link
+      tags: [nginx, ssl]
+
+    - name: Test Nginx configuration (before SSL)
+      command: nginx -t
+      register: nginx_test_pre
+      changed_when: false
+      tags: [nginx, ssl]
+
+    - name: Reload Nginx (before SSL)
+      systemd:
+        name: nginx
+        state: reloaded
+      tags: [nginx, ssl]
+
+    # ==========================================================================
+    # 7. SSL CERTIFICATE
     # ==========================================================================
     - name: Check if SSL certificate exists
       stat:
@@ -352,9 +409,9 @@
       tags: [ssl]
 
     # ==========================================================================
-    # 7. NGINX CONFIGURATION
+    # 8. NGINX CONFIGURATION (FULL WITH SSL)
     # ==========================================================================
-    - name: Create Nginx site config
+    - name: Create full Nginx site config with SSL
       copy:
         dest: "/etc/nginx/sites-available/{{ app_name }}.conf"
         mode: '0644'
@@ -429,20 +486,20 @@
       notify: Reload Nginx
       tags: [nginx, config]
 
-    - name: Test Nginx configuration
+    - name: Test Nginx configuration (with SSL)
       command: nginx -t
       register: nginx_test
       changed_when: false
       tags: [nginx, config]
 
-    - name: Force Nginx reload
+    - name: Force Nginx reload (with SSL)
       systemd:
         name: nginx
         state: reloaded
       tags: [nginx, config]
 
     # ==========================================================================
-    # 8. VERIFICATION
+    # 9. VERIFICATION
     # ==========================================================================
     - name: Check container status
       shell: docker compose -p {{ app_name }} ps
@@ -466,6 +523,43 @@
       delay: 5
       until: backend_health.status == 200
       ignore_errors: true
+      tags: [verify]
+
+    - name: Get backend container logs (if unhealthy)
+      shell: docker logs {{ app_name }}-backend --tail 100 2>&1
+      register: backend_logs
+      when: backend_health is failed or backend_health.status != 200
+      changed_when: false
+      tags: [verify]
+
+    - name: Display backend logs (if unhealthy)
+      debug:
+        msg: "{{ backend_logs.stdout_lines }}"
+      when: backend_health is failed or backend_health.status != 200
+      tags: [verify]
+
+    - name: Inspect backend container (if unhealthy)
+      shell: docker inspect {{ app_name }}-backend --format='{{ '{{' }}json .State{{ '}}' }}'
+      register: backend_inspect
+      when: backend_health is failed or backend_health.status != 200
+      changed_when: false
+      tags: [verify]
+
+    - name: Display backend container state (if unhealthy)
+      debug:
+        msg: "{{ backend_inspect.stdout | from_json }}"
+      when: backend_health is failed or backend_health.status != 200
+      tags: [verify]
+
+    - name: Get frontend container logs
+      shell: docker logs {{ app_name }}-frontend --tail 50
+      register: frontend_logs
+      changed_when: false
+      tags: [verify]
+
+    - name: Display frontend logs
+      debug:
+        msg: "{{ frontend_logs.stdout_lines }}"
       tags: [verify]
 
     - name: Display deployment summary
