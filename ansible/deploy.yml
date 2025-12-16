@@ -219,79 +219,12 @@
     # ==========================================================================
     - name: Create application directories
       file:
-        path: "{{ item }}"
+        path: "{{ app_root }}"
         state: directory
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: '0755'
-      loop:
-        - "{{ app_root }}"
-        - "{{ backend_dir }}"
-        - "{{ frontend_dir }}"
       tags: [deploy]
-
-    - name: Clone backend repository
-      git:
-        repo: "{{ backend_repo }}"
-        dest: "{{ backend_dir }}"
-        version: "{{ backend_branch }}"
-        force: yes
-      become_user: "{{ ansible_user }}"
-      tags: [deploy]
-
-    - name: Clone frontend repository
-      git:
-        repo: "{{ frontend_repo }}"
-        dest: "{{ frontend_dir }}"
-        version: "{{ frontend_branch }}"
-        force: yes
-      become_user: "{{ ansible_user }}"
-      tags: [deploy]
-
-    - name: Create backend .env file
-      copy:
-        dest: "{{ backend_dir }}/.env"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0600'
-        content: |
-          NODE_ENV={{ 'production' if is_prod else 'development' }}
-          PORT={{ backend_port }}
-          
-          # MongoDB Atlas
-          MONGO_URI={{ mongo_uri }}
-          MONGO_DB={{ mongo_db | default('user_registration') }}
-          
-          # JWT
-          JWT_SECRET={{ jwt_secret }}
-          JWT_EXPIRES_IN={{ jwt_expires_in | default('7d') }}
-          JWT_REFRESH_SECRET={{ jwt_refresh_secret }}
-          JWT_REFRESH_EXPIRES_IN={{ jwt_refresh_expires_in | default('30d') }}
-          
-          # Google OAuth
-          GOOGLE_CLIENT_ID={{ google_client_id }}
-          GOOGLE_CLIENT_SECRET={{ google_client_secret }}
-          GOOGLE_CALLBACK_URL=https://{{ full_domain }}/api/auth/google/callback
-          
-          # CORS
-          FRONTEND_URL=https://{{ full_domain }}
-          
-          # App Info
-          APP_NAME={{ app_name }}
-          DOMAIN={{ full_domain }}
-      tags: [deploy, config]
-
-    - name: Create frontend .env file
-      copy:
-        dest: "{{ frontend_dir }}/.env"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0600'
-        content: |
-          VITE_API_URL=https://{{ full_domain }}/api
-          VITE_APP_NAME={{ app_name }}
-          VITE_ENVIRONMENT={{ 'production' if is_prod else 'development' }}
-      tags: [deploy, config]
 
     - name: Create docker-compose.yml
       copy:
@@ -309,11 +242,21 @@
               restart: unless-stopped
               ports:
                 - "127.0.0.1:{{ backend_port }}:{{ backend_port }}"
-              env_file:
-                - ./backend/.env
-              volumes:
-                - ./backend:/app
-                - /app/node_modules
+              environment:
+                - NODE_ENV={{ 'production' if is_prod else 'development' }}
+                - PORT={{ backend_port }}
+                - MONGO_URI={{ mongo_uri }}
+                - MONGO_DB={{ mongo_db | default('user_registration') }}
+                - JWT_SECRET={{ jwt_secret }}
+                - JWT_EXPIRES_IN={{ jwt_expires_in | default('7d') }}
+                - JWT_REFRESH_SECRET={{ jwt_refresh_secret }}
+                - JWT_REFRESH_EXPIRES_IN={{ jwt_refresh_expires_in | default('30d') }}
+                - GOOGLE_CLIENT_ID={{ google_client_id }}
+                - GOOGLE_CLIENT_SECRET={{ google_client_secret }}
+                - GOOGLE_CALLBACK_URL=https://{{ full_domain }}/api/auth/google/callback
+                - FRONTEND_URL=https://{{ full_domain }}
+                - APP_NAME={{ app_name }}
+                - DOMAIN={{ full_domain }}
               networks:
                 - {{ app_name }}-network
               healthcheck:
@@ -328,8 +271,10 @@
               restart: unless-stopped
               ports:
                 - "127.0.0.1:{{ frontend_port }}:80"
-              env_file:
-                - ./frontend/.env
+              environment:
+                - VITE_API_URL=https://{{ full_domain }}/api
+                - VITE_APP_NAME={{ app_name }}
+                - VITE_ENVIRONMENT={{ 'production' if is_prod else 'development' }}
               networks:
                 - {{ app_name }}-network
               depends_on:
