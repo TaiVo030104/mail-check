@@ -54,14 +54,17 @@ export function useCreateColumn() {
 
   return useMutation({
     mutationFn: (data: CreateColumnDto) => kanbanService.createColumn(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kanbanKeys.board() });
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: kanbanKeys.board() });
+      await queryClient.refetchQueries({ queryKey: kanbanKeys.board() });
       toast({
         title: 'Column Created',
         description: 'New column has been added to your board.',
       });
+      console.log('Column created successfully:', data);
     },
     onError: (error: any) => {
+      console.error('Failed to create column:', error);
       toast({
         title: 'Failed to Create Column',
         description: error.response?.data?.message || 'Something went wrong',

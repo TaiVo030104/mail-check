@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useEmailsByFolder, useUpdateEmailLabels } from "@/hooks/react-query/useEmails";
 import { useKanbanBoard, useCreateColumn, useUpdateColumn, useDeleteColumn } from "@/hooks/react-query/useKanban";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Email } from "@/services/email";
 import { EmailFilterValues } from "./email-filters";
 import { EmailDetail } from "./email-detail";
@@ -174,10 +175,17 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
 
   const { toast } = useToast();
   const updateLabelsMutation = useUpdateEmailLabels();
+  const queryClient = useQueryClient();
   const { data: boardData, isLoading: isBoardLoading, refetch: refetchBoard } = useKanbanBoard();
   const createColumnMutation = useCreateColumn();
   const updateColumnMutation = useUpdateColumn();
   const deleteColumnMutation = useDeleteColumn();
+  
+  // Force refresh board on mount to get latest data
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['kanban', 'board'] });
+    refetchBoard();
+  }, []);
 
   const {
     data: inboxData,
@@ -199,7 +207,9 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     isInboxLoading || isArchiveLoading || isSnoozedLoading || isBoardLoading || !boardData;
 
   useEffect(() => {
-    if (!boardData?.columns) return;
+    if (!boardData?.columns) {
+      return;
+    }
 
     const mapped: KanbanColumn[] = boardData.columns
       .slice()
@@ -209,7 +219,8 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
         return {
           id: col.id,
           title: col.title,
-          label: (col as any).label ?? fallback?.label ?? "",
+          // Use label from backend first, fallback to default, or use col.id as last resort
+          label: (col as any).label ?? col.id ?? fallback?.label ?? "",
           description: col.description,
         };
       });
@@ -360,13 +371,26 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   };
 
   const handleAddColumn = (column: Omit<KanbanColumn, "id">) => {
-    createColumnMutation.mutate({
+    const newColumnData = {
       id: column.label,
       title: column.title,
       description: column.description,
       position: kanbanColumns.length,
       label: column.label,
-    });
+    };
+    
+    createColumnMutation.mutate(
+      newColumnData,
+      {
+        onSuccess: (data) => {
+          refetchBoard();
+          setShowColumnManager(false);
+        },
+        onError: (error) => {
+          console.error('Error creating column:', error);
+        },
+      }
+    );
   };
 
   const handleUpdateColumn = (id: string, updates: Partial<KanbanColumn>) => {
@@ -375,11 +399,22 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.label !== undefined) payload.label = updates.label;
 
-    updateColumnMutation.mutate({ columnId: id, data: payload });
+    updateColumnMutation.mutate(
+      { columnId: id, data: payload },
+      {
+        onSuccess: () => {
+          refetchBoard();
+        },
+      }
+    );
   };
 
   const handleDeleteColumn = (id: string) => {
-    deleteColumnMutation.mutate(id);
+    deleteColumnMutation.mutate(id, {
+      onSuccess: () => {
+        refetchBoard();
+      },
+    });
   };
 
   return (
@@ -409,11 +444,18 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
       </div>
 
       <DndProvider backend={HTML5Backend}>
-        <div className="grid h-full min-h-[400px] flex-1 grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {isLoading ? (
-            <div className="col-span-full flex items-center justify-center">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
+        <div className="flex-1 overflow-x-auto pb-4">
+          <div 
+            className="grid h-full min-h-[400px] gap-3"
+            style={{
+              gridTemplateColumns: `repeat(${kanbanColumns.length}, minmax(280px, 1fr))`,
+              minWidth: `${kanbanColumns.length * 280}px`,
+            }}
+          >
+            {isLoading ? (
+              <div className="col-span-full flex items-center justify-center">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              </div>
           ) : (
             kanbanColumns.map((column) => (
               <KanbanColumnComponent
@@ -425,6 +467,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
               />
             ))
           )}
+        </div>
         </div>
       </DndProvider>
 
