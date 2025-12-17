@@ -382,7 +382,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     createColumnMutation.mutate(
       newColumnData,
       {
-        onSuccess: (data) => {
+        onSuccess: () => {
           refetchBoard();
           setShowColumnManager(false);
         },
