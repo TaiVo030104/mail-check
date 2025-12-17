@@ -50,7 +50,67 @@ export const EmailList = memo(function EmailList({
   const { data, isLoading } = useEmailsByFolder(folder, page, pageSize, filters);
   
   // Use search results if provided, otherwise use folder emails
-  const displayEmails = searchEmails || data?.emails || [];
+  let displayEmails = searchEmails || data?.emails || [];
+  
+  // Apply filters to search results if searching
+  if (searchEmails && filters) {
+    displayEmails = [...searchEmails];
+    
+    // Apply read/unread filter
+    if (filters.unread !== undefined) {
+      displayEmails = displayEmails.filter(email => email.isRead !== filters.unread);
+    }
+    
+    // Apply starred filter
+    if (filters.starred !== undefined) {
+      displayEmails = displayEmails.filter(email => email.isStarred === filters.starred);
+    }
+    
+    // Apply has attachments filter
+    if (filters.hasAttachments !== undefined) {
+      displayEmails = displayEmails.filter(email => email.hasAttachments === filters.hasAttachments);
+    }
+    
+    // Apply from/sender filter
+    if (filters.from?.trim()) {
+      const fromLower = filters.from.toLowerCase();
+      displayEmails = displayEmails.filter(email => 
+        email.from.toLowerCase().includes(fromLower)
+      );
+    }
+    
+    // Apply date range filter
+    if (filters.startDate) {
+      displayEmails = displayEmails.filter(email => 
+        new Date(email.sentAt) >= filters.startDate!
+      );
+    }
+    if (filters.endDate) {
+      const endOfDay = new Date(filters.endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      displayEmails = displayEmails.filter(email => 
+        new Date(email.sentAt) <= endOfDay
+      );
+    }
+    
+    // Apply sorting
+    if (filters.sort) {
+      displayEmails.sort((a, b) => {
+        switch (filters.sort) {
+          case 'newest':
+            return new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime();
+          case 'oldest':
+            return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
+          case 'sender-asc':
+            return a.from.localeCompare(b.from);
+          case 'sender-desc':
+            return b.from.localeCompare(a.from);
+          default:
+            return 0;
+        }
+      });
+    }
+  }
   
   const listRef = useRef<HTMLDivElement>(null);
   const pageEmailIds = displayEmails.map((email) => email.id) ?? [];

@@ -217,11 +217,53 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     setKanbanColumns(mapped);
   }, [boardData]);
 
-  const allEmails: Email[] = searchEmails || [
+  let allEmails: Email[] = searchEmails || [
     ...(inboxData?.emails || []),
     ...(archiveData?.emails || []),
     ...(snoozedData?.emails || []),
   ];
+  
+  // Apply filters to search results if searching
+  if (searchEmails && filters) {
+    allEmails = [...searchEmails];
+    
+    // Apply read/unread filter
+    if (filters.unread !== undefined) {
+      allEmails = allEmails.filter(email => email.isRead !== filters.unread);
+    }
+    
+    // Apply starred filter
+    if (filters.starred !== undefined) {
+      allEmails = allEmails.filter(email => email.isStarred === filters.starred);
+    }
+    
+    // Apply has attachments filter
+    if (filters.hasAttachments !== undefined) {
+      allEmails = allEmails.filter(email => email.hasAttachments === filters.hasAttachments);
+    }
+    
+    // Apply from/sender filter
+    if (filters.from?.trim()) {
+      const fromLower = filters.from.toLowerCase();
+      allEmails = allEmails.filter(email => 
+        email.from.toLowerCase().includes(fromLower)
+      );
+    }
+    
+    // Apply date range filter
+    if (filters.startDate) {
+      allEmails = allEmails.filter(email => 
+        new Date(email.sentAt) >= filters.startDate!
+      );
+    }
+    if (filters.endDate) {
+      const endOfDay = new Date(filters.endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      allEmails = allEmails.filter(email => 
+        new Date(email.sentAt) <= endOfDay
+      );
+    }
+  }
 
   const getEmailsForColumn = (column: KanbanColumn): Email[] => {
     let emails: Email[] = [];
