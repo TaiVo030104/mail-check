@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { GoogleButton } from "@/components/ui/google-button";
 import { Separator } from "@/components/ui/separator";
 import { useSignUp } from "@/hooks/react-query/useAuth";
+import { ENABLE_GOOGLE_AUTH } from "@/lib/consts";
 
 const formSchema = z
   .object({
@@ -78,13 +79,17 @@ export default function SignUpPage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <GoogleButton />
-        <div className="relative">
-          <Separator />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-xs text-muted-foreground">
-            OR
-          </span>
-        </div>
+        {ENABLE_GOOGLE_AUTH && (
+          <>
+            <GoogleButton />
+            <div className="relative">
+              <Separator />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-xs text-muted-foreground">
+                OR
+              </span>
+            </div>
+          </>
+        )}
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

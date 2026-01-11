@@ -16,3 +16,7 @@ export const CONTENT_TYPE_OPTIONS = [
   { value: EnumQuestion.FillInTheBlank, label: "Fill in the blanks" },
   { value: EnumQuestion.Matching, label: "Matching" },
 ];
+
+// Feature flags
+export const ENABLE_GOOGLE_AUTH = import.meta.env.VITE_ENABLE_GOOGLE_AUTH !== "false";
+export const ENABLE_GPT_5_1_CODEX_MAX = import.meta.env.VITE_ENABLE_GPT5_1_CODEX_MAX === "true";
