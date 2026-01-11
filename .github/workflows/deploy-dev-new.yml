@@ -80,6 +80,9 @@ jobs:
           google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}
           google_client_secret=${{ secrets.GOOGLE_CLIENT_SECRET }}
           
+          # Google Gemini AI
+          gemini_api_key=${{ secrets.GEMINI_API_KEY }}
+          
           # SSL
           ssl_email=${{ secrets.SSL_EMAIL || 'anhhao012004@gmail.com' }}
           EOF
