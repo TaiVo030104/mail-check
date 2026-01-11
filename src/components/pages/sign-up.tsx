@@ -10,6 +10,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,7 +18,7 @@ import {
 } from "@components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Lock, Mail, User } from "lucide-react";
+import { Loader2, Lock, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -29,8 +30,10 @@ import { ENABLE_GOOGLE_AUTH } from "@/lib/consts";
 
 const formSchema = z
   .object({
-    username: z.string().min(1, "Username is required"),
-    email: z.string().email(),
+    username: z
+      .string()
+      .min(3, "Username must be at least 3 characters")
+      .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers and underscores"),
     password: z.string().min(8, "Password must be at least 8 characters long"),
     confirmPassword: z.string().min(8, "Password must be at least 8 characters long"),
   })
@@ -51,7 +54,6 @@ export default function SignUpPage() {
   const form = useForm<FormInputs>({
     defaultValues: {
       username: "",
-      email: "",
       password: "",
       confirmPassword: "",
     },
@@ -59,10 +61,12 @@ export default function SignUpPage() {
   });
   const signUpMutation = useSignUp();
 
+  const watchUsername = form.watch("username");
+  const generatedEmail = watchUsername ? `${watchUsername.toLowerCase()}@hkt.com` : "";
+
   function onSubmit(data: FormInputs) {
     signUpMutation.mutate({
       username: data.username,
-      email: data.email,
       password: data.password,
     });
   }
@@ -105,7 +109,7 @@ export default function SignUpPage() {
                         <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                           type="text"
-                          placeholder="Your display name"
+                          placeholder="johndoe"
                           error={Boolean(form.formState.errors.username)}
                           className="pl-10"
                           {...field}
@@ -113,31 +117,11 @@ export default function SignUpPage() {
                         />
                       </div>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-slate-800">
-                      Email<span className="ml-1 text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="email"
-                          placeholder="example@gmail.com"
-                          error={Boolean(form.formState.errors.email)}
-                          className="pl-10"
-                          {...field}
-                          onChange={field.onChange}
-                        />
-                      </div>
-                    </FormControl>
+                    {generatedEmail && (
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Your email will be: <span className="font-medium text-primary">{generatedEmail}</span>
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -163,7 +147,6 @@ export default function SignUpPage() {
                         />
                       </div>
                     </FormControl>
-
                     <FormMessage />
                   </FormItem>
                 )}
@@ -189,7 +172,6 @@ export default function SignUpPage() {
                         />
                       </div>
                     </FormControl>
-
                     <FormMessage />
                   </FormItem>
                 )}
