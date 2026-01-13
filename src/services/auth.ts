@@ -27,6 +27,7 @@ export type AuthUser = {
 };
 
 // Check if using cookie-based auth
+// Default to false (localStorage mode)
 const USE_COOKIES = import.meta.env.VITE_USE_COOKIE_AUTH === "true";
 
 export const signIn = async (params: SignInParams) => {

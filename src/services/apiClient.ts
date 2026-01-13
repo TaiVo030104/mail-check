@@ -7,6 +7,7 @@ import { authSync } from "./authSync";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 // Support for httpOnly cookies (backend sets cookies automatically)
+// Default to false (localStorage mode)
 const USE_COOKIES = import.meta.env.VITE_USE_COOKIE_AUTH === "true";
 
 // axios instance used for regular API requests (will attach access token)
@@ -29,6 +30,12 @@ async function refreshAccessToken(): Promise<string | null> {
   
   // If using cookies, backend will automatically read from httpOnly cookie
   // If using localStorage, we need to send the token in the body
+  console.log('🔍 Refresh token check:', {
+    useCookies: USE_COOKIES,
+    hasRefreshToken: !!refreshToken,
+    refreshTokenLength: refreshToken?.length || 0,
+  });
+  
   if (!USE_COOKIES && !refreshToken) {
     console.warn('⚠️ No refresh token available');
     return null;
@@ -45,6 +52,7 @@ async function refreshAccessToken(): Promise<string | null> {
       console.log('🔄 Refreshing access token...');
       // Send refreshToken only if not using cookies
       const payload = USE_COOKIES ? {} : { refreshToken };
+      console.log('📤 Sending refresh request with payload:', USE_COOKIES ? '{}' : '{ refreshToken: <token> }');
       const resp = await apiAuth.post("/refresh", payload);
       const data = resp.data as { accessToken: string; refreshToken?: string };
       const accessToken = data.accessToken;
