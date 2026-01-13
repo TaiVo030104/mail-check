@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 function exec(command) {
   try {
-    return execSync(command, { encoding: 'utf8' }).trim();
+    return execSync(command, { encoding: 'utf8', stdio: 'pipe' }).trim();
   } catch (error) {
     return 'unknown';
   }
@@ -23,7 +23,13 @@ function exec(command) {
 
 // Read package.json for version
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+let packageJson = { version: '1.0.0', name: 'Email Application Frontend' };
+
+try {
+  packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+} catch (error) {
+  console.warn('Warning: Could not read package.json, using defaults');
+}
 
 const buildInfo = {
   version: packageJson.version || '1.0.0',
@@ -41,13 +47,30 @@ const buildInfo = {
   },
   deployment: {
     deployedAt: new Date().toISOString(),
-    deployedBy: process.env.USER || process.env.USERNAME || 'unknown',
+    deployedBy: process.env.USER || process.env.USERNAME || 'docker',
   },
 };
 
-// Write to public folder so it can be accessed at runtime
-const outputPath = path.join(__dirname, '..', 'public', 'build-info.json');
-fs.writeFileSync(outputPath, JSON.stringify(buildInfo, null, 2));
+// Ensure public folder exists
+const publicDir = path.join(__dirname, '..', 'public');
+try {
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+    console.log('Created public directory');
+  }
+} catch (error) {
+  console.error('Warning: Could not create public directory:', error.message);
+}
 
-console.log('✅ Frontend build info generated successfully!');
-console.log(JSON.stringify(buildInfo, null, 2));
+// Write to public folder so it can be accessed at runtime
+const outputPath = path.join(publicDir, 'build-info.json');
+try {
+  fs.writeFileSync(outputPath, JSON.stringify(buildInfo, null, 2));
+  console.log('✅ Frontend build info generated successfully!');
+  console.log(JSON.stringify(buildInfo, null, 2));
+} catch (error) {
+  console.error('Warning: Could not write build-info.json:', error.message);
+  console.error('Build will continue without build info...');
+  // Don't fail the build, just warn
+  process.exit(0);
+}
