@@ -1,6 +1,6 @@
 import { useMailboxes } from '@/hooks/react-query/useEmails';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Inbox, Star, Send, FileText, Archive, Trash2 } from 'lucide-react';
+import { Loader2, Inbox, Star, Send, FileText, Archive, Trash2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MailboxSidebarProps {
@@ -15,6 +15,7 @@ const folderIcons: Record<string, React.ElementType> = {
   drafts: FileText,
   archive: Archive,
   trash: Trash2,
+  snoozed: Clock,
 };
 
 export function MailboxSidebar({ selectedFolder, onSelectFolder }: MailboxSidebarProps) {

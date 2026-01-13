@@ -1,29 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, X } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface EmailFilterValues {
-  search?: string;
   from?: string;
   unread?: boolean;
   starred?: boolean;
   startDate?: Date;
   endDate?: Date;
+  hasAttachments?: boolean;
+  sort?: 'newest' | 'oldest' | 'sender-asc' | 'sender-desc';
 }
 
 interface EmailFiltersProps {
@@ -36,48 +38,37 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
   const [localFilters, setLocalFilters] = useState<EmailFilterValues>(filters);
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleSearchChange = (value: string) => {
-    const newFilters = { ...filters, search: value || undefined };
-    onFiltersChange(newFilters);
-  };
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
 
   const handleApplyFilters = () => {
-    onFiltersChange(localFilters);
+    onFiltersChange({ ...localFilters, sort: localFilters.sort || 'newest' });
     setIsOpen(false);
   };
 
   const handleClearFilters = () => {
-    setLocalFilters({});
+    setLocalFilters({ sort: 'newest' });
     onClearFilters();
     setIsOpen(false);
   };
 
-  const hasActiveFilters = Boolean(
-    filters.from || 
-    filters.unread !== undefined || 
-    filters.starred !== undefined || 
-    filters.startDate || 
-    filters.endDate
-  );
+  const activeFiltersCount = [
+    filters.from,
+    filters.unread ? true : undefined,
+    filters.starred ? true : undefined,
+    filters.startDate,
+    filters.endDate,
+    filters.hasAttachments ? true : undefined,
+  ].filter((value) => value !== undefined && value !== '').length;
+
+  const hasActiveFilters = activeFiltersCount > 0;
 
   return (
-    <div className="flex items-center gap-2 p-3 md:p-4 border-b bg-background">
-      {/* Search Input */}
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search emails..."
-          value={filters.search || ''}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="pl-9 pr-4 h-9"
-          aria-label="Search emails"
-        />
-      </div>
-
+    <div className={cn('flex items-center gap-2')}>
       {/* Advanced Filters */}
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetTrigger asChild>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
           <Button 
             variant={hasActiveFilters ? "default" : "outline"} 
             size="sm" 
@@ -88,18 +79,18 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
             <span className="hidden sm:inline">Filters</span>
             {hasActiveFilters && (
               <span className="h-5 w-5 rounded-full bg-primary-foreground text-primary text-xs flex items-center justify-center font-semibold">
-                {Object.values(localFilters).filter(v => v !== undefined && v !== '').length}
+                {activeFiltersCount}
               </span>
             )}
           </Button>
-        </SheetTrigger>
-        <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-          <SheetHeader>
-            <SheetTitle>Filter Emails</SheetTitle>
-            <SheetDescription>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Filter Emails</DialogTitle>
+            <DialogDescription>
               Narrow down your search with advanced filters
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <div className="mt-6 space-y-6">
             {/* From Filter */}
@@ -140,6 +131,19 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
                   checked={localFilters.starred || false}
                   onCheckedChange={(checked: boolean) => 
                     setLocalFilters({ ...localFilters, starred: checked ? true : undefined })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="attachments-filter" className="font-normal cursor-pointer">
+                  Has attachment
+                </Label>
+                <Switch
+                  id="attachments-filter"
+                  checked={localFilters.hasAttachments || false}
+                  onCheckedChange={(checked: boolean) =>
+                    setLocalFilters({ ...localFilters, hasAttachments: checked ? true : undefined })
                   }
                 />
               </div>
@@ -218,6 +222,30 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
               </div>
             </div>
 
+            {/* Sorting */}
+            <div className="space-y-2">
+              <Label htmlFor="sort-order">Sort</Label>
+              <Select
+                value={localFilters.sort || 'newest'}
+                onValueChange={(value) =>
+                  setLocalFilters({
+                    ...localFilters,
+                    sort: value as EmailFilterValues['sort'],
+                  })
+                }
+              >
+                <SelectTrigger id="sort-order">
+                  <SelectValue placeholder="Select order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Date: newest first</SelectItem>
+                  <SelectItem value="oldest">Date: oldest first</SelectItem>
+                  <SelectItem value="sender-asc">Sender: A–Z</SelectItem>
+                  <SelectItem value="sender-desc">Sender: Z–A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex gap-2 pt-4">
               <Button
@@ -236,21 +264,8 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Clear Search Button */}
-      {filters.search && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleSearchChange('')}
-          className="h-9 px-2"
-          aria-label="Clear search"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

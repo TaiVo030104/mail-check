@@ -6,8 +6,10 @@ export function useMailboxes() {
   return useQuery({
     queryKey: ['mailboxes'],
     queryFn: () => emailService.getMailboxes(),
-    staleTime: 30000, // Cache mailbox counts for 30 seconds
-    refetchOnWindowFocus: true, // Refetch when window gains focus
+    staleTime: 1000 * 60 * 2, // 2 minutes - mailbox counts don't change that often
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: true,
+    refetchInterval: 1000 * 60 * 2, // Auto-refresh every 2 minutes in background
   });
 }
 
@@ -21,9 +23,10 @@ export function useEmailsByFolder(
     queryKey: ['emails', folder, page, limit, filters],
     queryFn: () => emailService.getEmailsByFolder(folder, page, limit, filters),
     enabled: !!folder,
-    staleTime: 0, // Always fetch fresh data for emails
-    refetchOnWindowFocus: true, // Refetch when window gains focus
-    refetchOnMount: true, // Refetch when component mounts
+    staleTime: 1000 * 30, // 30 seconds - balance freshness vs performance
+    gcTime: 1000 * 60 * 5, // Keep cached for 5 minutes
+    refetchOnWindowFocus: true,
+    // Remove refetchOnMount to use cache when navigating back
   });
 }
 
@@ -32,6 +35,8 @@ export function useEmailDetail(id: string) {
     queryKey: ['email', id],
     queryFn: () => emailService.getEmailById(id),
     enabled: !!id,
+    staleTime: 1000 * 60, // 1 minute - email content rarely changes
+    gcTime: 1000 * 60 * 10, // Keep in cache longer for quick navigation
   });
 }
 
@@ -41,9 +46,18 @@ export function useSendEmail() {
 
   return useMutation({
     mutationFn: (data: SendEmailDto) => emailService.sendEmail(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'sent'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: 'Email sent successfully!',
@@ -67,10 +81,22 @@ export function useReplyEmail() {
     mutationFn: ({ id, data }: { id: string; data: ReplyEmailDto }) => {
       return emailService.replyEmail(id, data);
     },
-    onSuccess: (_response, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
-      queryClient.invalidateQueries({ queryKey: ['email', variables.id] });
+    onSuccess: async (_response: any, variables: any) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'sent'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['email', variables.id],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: 'Reply sent successfully!',
@@ -92,10 +118,27 @@ export function useToggleStar() {
 
   return useMutation({
     mutationFn: (id: string) => emailService.toggleStar(id),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
-      queryClient.invalidateQueries({ queryKey: ['email'] });
+    onSuccess: async (data) => {
+      // Only invalidate affected folders
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'starred'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'inbox'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['email'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: data.isStarred ? 'Starred' : 'Unstarred',
         description: data.isStarred
@@ -119,37 +162,29 @@ export function useMarkAsRead() {
   return useMutation({
     mutationFn: ({ id, isRead }: { id: string; isRead: boolean }) =>
       emailService.markAsRead(id, isRead),
-    onMutate: async ({ id, isRead }) => {
-      await queryClient.cancelQueries({ queryKey: ['email', id] });
-      await queryClient.cancelQueries({ queryKey: ['emails'] });
-
-      const previousEmail = queryClient.getQueryData(['email', id]);
-
-      queryClient.setQueryData(['email', id], (old: any) => {
-        if (!old) return old;
-        return { ...old, isRead };
+    onSuccess: async (_data, variables) => {
+      // Invalidate mailboxes to update unread counts
+      await queryClient.invalidateQueries({ 
+        queryKey: ['mailboxes'],
+        refetchType: 'active' // Only refetch if component is mounted
       });
-
-      queryClient.setQueriesData({ queryKey: ['emails'] }, (old: any) => {
-        if (!old?.emails) return old;
-        return {
-          ...old,
-          emails: old.emails.map((email: any) =>
-            email.id === id ? { ...email, isRead } : email
-          ),
-        };
+      
+      // Invalidate email lists - this will use cache if within staleTime
+      await queryClient.invalidateQueries({ 
+        queryKey: ['emails'],
+        refetchType: 'active'
       });
-
-      return { previousEmail };
-    },
-    onError: (_err, { id }, context) => {
-      if (context?.previousEmail) {
-        queryClient.setQueryData(['email', id], context.previousEmail);
+      
+      // Invalidate specific email detail
+      if (variables?.id) {
+        await queryClient.invalidateQueries({ 
+          queryKey: ['email', variables.id],
+          refetchType: 'active'
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+    onError: (error: any) => {
+      console.error('Failed to mark email as read:', error);
     },
   });
 }
@@ -160,9 +195,19 @@ export function useDeleteEmail() {
 
   return useMutation({
     mutationFn: (id: string) => emailService.deleteEmail(id),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async (data) => {
+      // Delete affects multiple folders
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: data.message,
@@ -184,9 +229,19 @@ export function useSeedMockEmails() {
 
   return useMutation({
     mutationFn: () => emailService.seedMockEmails(),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async (data) => {
+      // Clear all email cache after seeding
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: data.message,
@@ -242,9 +297,19 @@ export function useBulkDelete() {
 
   return useMutation({
     mutationFn: (emailIds: string[]) => emailService.bulkDelete(emailIds),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async (data) => {
+      // Bulk delete affects all folders
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: data.message,
@@ -267,9 +332,23 @@ export function useBulkToggleStar() {
   return useMutation({
     mutationFn: ({ emailIds, star }: { emailIds: string[]; star: boolean }) =>
       emailService.bulkToggleStar(emailIds, star),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async (data) => {
+      // Star affects starred and inbox folders
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'starred'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails', 'inbox'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: data.message,
@@ -292,9 +371,19 @@ export function useBulkMarkAsRead() {
   return useMutation({
     mutationFn: ({ emailIds, isRead }: { emailIds: string[]; isRead: boolean }) =>
       emailService.bulkMarkAsRead(emailIds, isRead),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
+    onSuccess: async (data) => {
+      // Read status affects mailbox counts and current view
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails'],
+          refetchType: 'active'
+        }),
+      ]);
+      
       toast({
         title: 'Success',
         description: data.message,
@@ -304,6 +393,109 @@ export function useBulkMarkAsRead() {
       toast({
         title: 'Error',
         description: error.response?.data?.message || 'Failed to update emails',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useSelectAllEmailIds() {
+  return useMutation({
+    mutationFn: ({ folder, filters }: { folder: string; filters?: EmailFilters }) =>
+      emailService.getEmailSelection(folder, filters),
+  });
+}
+
+export function useSnoozeEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ emailId, snoozeUntil }: { emailId: string; snoozeUntil: string }) =>
+      emailService.snoozeEmail(emailId, snoozeUntil),
+    onSuccess: async () => {
+      // Snooze affects multiple views
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['mailboxes'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['emails'],
+          refetchType: 'active'
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['kanban'],
+          refetchType: 'active'
+        }),
+      ]);
+      
+      toast({
+        title: 'Email snoozed',
+        description: 'Email has been snoozed successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to snooze email',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useUnsnoozeEmail() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (emailId: string) => emailService.unsnoozeEmail(emailId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast({
+        title: 'Email unsnoozed',
+        description: 'Email has been restored to inbox',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to unsnooze email',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useUpdateEmailLabels() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ emailId, labels }: { emailId: string; labels: string[] }) =>
+      emailService.updateEmailLabels(emailId, labels),
+    onSuccess: async () => {
+      // Invalidate all email-related queries and wait for refetch
+      await queryClient.invalidateQueries({ 
+        queryKey: ['emails'],
+        refetchType: 'all' // Refetch all matching queries, not just active ones
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['email'],
+        refetchType: 'all'
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['mailboxes'],
+        refetchType: 'all'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to update labels',
         variant: 'destructive',
       });
     },
