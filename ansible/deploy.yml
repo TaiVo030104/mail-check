@@ -260,6 +260,12 @@
                 - GOOGLE_CALLBACK_URL=https://{{ full_domain }}/api/auth/google/callback
                 - FRONTEND_URL=https://{{ full_domain }}
                 - GEMINI_API_KEY={{ gemini_api_key | default('') }}
+                - MAIL_HOST={{ mail_host | default('smtp.gmail.com') }}
+                - MAIL_PORT={{ mail_port | default('587') }}
+                - MAIL_SECURE={{ mail_secure | default('false') }}
+                - MAIL_USER={{ mail_user | default('') }}
+                - MAIL_PASSWORD={{ mail_password | default('') }}
+                - "MAIL_FROM={{ mail_from | default('System <noreply@system.com>') }}"
                 - APP_NAME={{ app_name }}
                 - DOMAIN={{ full_domain }}
               networks:
