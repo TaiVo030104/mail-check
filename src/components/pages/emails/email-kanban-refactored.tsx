@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useEmailsByFolder, useUpdateEmailLabels } from "@/hooks/react-query/useEmails";
-import { useKanbanBoard, useCreateColumn, useUpdateColumn, useDeleteColumn } from "@/hooks/react-query/useKanban";
+import { useEmailsByFolder } from "@/hooks/react-query/useEmails";
+import { useKanbanBoard, useCreateColumn, useUpdateColumn, useDeleteColumn, useMoveCard } from "@/hooks/react-query/useKanban";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Email } from "@/services/email";
@@ -174,7 +174,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   const [kanbanColumns, setKanbanColumns] = useState<KanbanColumn[]>(DEFAULT_KANBAN_COLUMNS);
 
   const { toast } = useToast();
-  const updateLabelsMutation = useUpdateEmailLabels();
+  const moveCardMutation = useMoveCard();
   const queryClient = useQueryClient();
   const { data: boardData, isLoading: isBoardLoading, refetch: refetchBoard } = useKanbanBoard();
   const createColumnMutation = useCreateColumn();
@@ -277,6 +277,22 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   }
 
   const getEmailsForColumn = (column: KanbanColumn): Email[] => {
+    // If we have board data with cards, use that for positioning
+    if (boardData?.columns) {
+      const boardColumn = boardData.columns.find((col) => col.id === column.id);
+      if (boardColumn?.cards && boardColumn.cards.length > 0) {
+        // Get emails from board cards
+        const emailsFromCards = boardColumn.cards
+          .map((card) => allEmails.find((e) => e.id === card.emailId))
+          .filter((e): e is Email => e !== undefined);
+        
+        if (emailsFromCards.length > 0) {
+          return emailsFromCards;
+        }
+      }
+    }
+    
+    // Fallback to label-based filtering (for emails not yet in board)
     let emails: Email[] = [];
 
     if (column.id === "inbox") {
@@ -325,24 +341,25 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
       return;
     }
 
-    const currentLabels = email.labels || [];
-    const labelsToRemove = kanbanColumns.map((c) => c.label).filter((l) => l !== "");
-    const newLabels = currentLabels.filter((label) => !labelsToRemove.includes(label));
-
-    if (toColumn !== "inbox") {
-      const targetColumn = kanbanColumns.find((c) => c.id === toColumn);
-      if (targetColumn?.label) {
-        newLabels.push(targetColumn.label);
-      }
-    }
-
-    updateLabelsMutation.mutate(
-      { emailId, labels: newLabels },
+    // Use Kanban API to move card (will sync with Gmail if applicable)
+    moveCardMutation.mutate(
+      { 
+        emailId, 
+        fromColumn, 
+        toColumn,
+        position: 0 // Add to top of column
+      },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          // Refetch emails to get updated labels
+          refetchInbox();
+          refetchArchive();
+          refetchSnoozed();
+          refetchBoard();
+          
           toast({
             title: "Email moved",
-            description: `Moved to ${kanbanColumns.find((c) => c.id === toColumn)?.title}`,
+            description: `Moved to ${kanbanColumns.find((c) => c.id === toColumn)?.title}${data.synced ? ' (Gmail synced)' : ''}`,
           });
         },
         onError: () => {

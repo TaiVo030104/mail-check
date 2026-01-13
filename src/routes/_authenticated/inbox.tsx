@@ -14,6 +14,7 @@ import { EmailList } from "@/components/pages/emails/email-list";
 import { KeyboardShortcutsHelp } from "@/components/pages/emails/keyboard-shortcuts-help";
 import { MailboxSidebar } from "@/components/pages/emails/mailbox-sidebar";
 import { UnifiedSearchBar } from "@/components/pages/emails/unified-search-bar";
+import { EmailAccountSettings } from "@/components/pages/emails/EmailAccountSettings";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -52,6 +53,7 @@ function InboxPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -441,11 +443,11 @@ function InboxPage() {
                 View Profile
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => (window.location.href = "/settings")}
+                onClick={() => setIsSettingsOpen(true)}
                 className="cursor-pointer"
               >
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                Email Accounts
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setIsKeyboardHelpOpen(true)}
@@ -647,6 +649,8 @@ function InboxPage() {
       <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onOpenChange={setIsKeyboardHelpOpen} />
       
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
+      
+      <EmailAccountSettings open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }
