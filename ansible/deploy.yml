@@ -412,7 +412,7 @@
         mode: '0755'
       tags: [ssl]
 
-    - name: Obtain SSL certificate
+    - name: Obtain SSL certificate for main domain
       shell: |
         certbot certonly --webroot \
           -w /var/www/certbot \
@@ -422,6 +422,33 @@
           --non-interactive
       when: not ssl_cert.stat.exists
       tags: [ssl]
+
+    # ==========================================================================
+    # 7.5 DOZZLE SSL CERTIFICATE
+    # ==========================================================================
+    - name: Set Dozzle domain
+      set_fact:
+        dozzle_domain: "dozzle.{{ full_domain }}"
+      tags: [ssl, dozzle]
+
+    - name: Check if Dozzle SSL certificate exists
+      stat:
+        path: "/etc/letsencrypt/live/{{ full_domain }}/fullchain.pem"
+      register: dozzle_ssl_cert
+      tags: [ssl, dozzle]
+
+    - name: Obtain SSL certificate for Dozzle subdomain (if needed)
+      shell: |
+        certbot certonly --webroot \
+          -w /var/www/certbot \
+          -d {{ dozzle_domain }} \
+          --email {{ ssl_email }} \
+          --agree-tos \
+          --non-interactive \
+          --expand
+      when: not dozzle_ssl_cert.stat.exists
+      ignore_errors: true
+      tags: [ssl, dozzle]
 
     # ==========================================================================
     # 8. NGINX CONFIGURATION (FULL WITH SSL)
@@ -514,6 +541,94 @@
       tags: [nginx, config]
 
     # ==========================================================================
+    # 8.5 DOZZLE NGINX CONFIGURATION
+    # ==========================================================================
+    - name: Create Dozzle Nginx config
+      copy:
+        dest: "/etc/nginx/sites-available/{{ app_name }}-dozzle.conf"
+        mode: '0644'
+        content: |
+          # HTTP Server - Redirect to HTTPS
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ dozzle_domain }};
+          
+              # Certbot webroot for SSL challenges
+              location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+              }
+          
+              location / {
+                  return 301 https://$server_name$request_uri;
+              }
+          }
+          
+          # HTTPS Server
+          server {
+              listen 443 ssl http2;
+              listen [::]:443 ssl http2;
+              server_name {{ dozzle_domain }};
+          
+              # SSL Configuration (use wildcard or main cert)
+              ssl_certificate /etc/letsencrypt/live/{{ full_domain }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ full_domain }}/privkey.pem;
+              ssl_protocols TLSv1.2 TLSv1.3;
+              ssl_ciphers HIGH:!aNULL:!MD5;
+          
+              # Security headers
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+          
+              # Dozzle proxy
+              location / {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_http_version 1.1;
+                  
+                  # WebSocket support for real-time logs
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  
+                  # Timeouts for long-running log streams
+                  proxy_connect_timeout 300s;
+                  proxy_send_timeout 300s;
+                  proxy_read_timeout 300s;
+                  
+                  # Buffer settings for streaming
+                  proxy_buffering off;
+                  proxy_request_buffering off;
+              }
+          }
+      notify: Reload Nginx
+      tags: [nginx, config, dozzle]
+
+    - name: Enable Dozzle Nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}-dozzle.conf"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}-dozzle.conf"
+        state: link
+      notify: Reload Nginx
+      tags: [nginx, config, dozzle]
+
+    - name: Test Nginx configuration (with Dozzle)
+      command: nginx -t
+      register: nginx_test_dozzle
+      changed_when: false
+      tags: [nginx, config, dozzle]
+
+    - name: Force Nginx reload (with Dozzle)
+      systemd:
+        name: nginx
+        state: reloaded
+      tags: [nginx, config, dozzle]
+
+    # ==========================================================================
     # 9. VERIFICATION
     # ==========================================================================
     - name: Check container status
@@ -586,6 +701,7 @@
           - "Domain: https://{{ full_domain }}"
           - "Backend: http://127.0.0.1:{{ backend_port }}"
           - "Frontend: http://127.0.0.1:{{ frontend_port }}"
+          - "Dozzle Logs: https://{{ dozzle_domain }}"
           - "==================================================================="
       tags: [always]
 
