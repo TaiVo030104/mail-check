@@ -3,12 +3,11 @@ import { useAuthStore } from "@/hooks/useAuthStore";
 import { getRefreshToken, setRefreshToken, clearAllTokens } from "@/services/token";
 import { toast } from "@/hooks/use-toast";
 import { authSync } from "./authSync";
+import { API_BASE_URL, USE_COOKIE_AUTH } from "@/config/env";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-// Support for httpOnly cookies (backend sets cookies automatically)
-// Default to false (localStorage mode)
-const USE_COOKIES = import.meta.env.VITE_USE_COOKIE_AUTH === "true";
+// Use centralized config with defaults
+const BASE_URL = API_BASE_URL;
+const USE_COOKIES = USE_COOKIE_AUTH;
 
 // axios instance used for regular API requests (will attach access token)
 const api: AxiosInstance = axios.create({

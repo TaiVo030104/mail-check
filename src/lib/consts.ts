@@ -1,4 +1,5 @@
-// ENABLE_GOOGLE_AUTH: Default to true (enabled), set to "false" to disable
-export const ENABLE_GOOGLE_AUTH = import.meta.env.VITE_ENABLE_GOOGLE_AUTH !== "false";
-// ENABLE_GPT_5_1_CODEX_MAX: Default to true (enabled), set to "false" to disable
-export const ENABLE_GPT_5_1_CODEX_MAX = import.meta.env.VITE_ENABLE_GPT5_1_CODEX_MAX !== "false";
+import { ENABLE_GOOGLE_AUTH as GOOGLE_AUTH_ENABLED, ENABLE_GPT_5_1_CODEX_MAX as GPT_MAX_ENABLED } from "@/config/env";
+
+// Feature flags - using centralized config with defaults
+export const ENABLE_GOOGLE_AUTH = GOOGLE_AUTH_ENABLED;
+export const ENABLE_GPT_5_1_CODEX_MAX = GPT_MAX_ENABLED;
