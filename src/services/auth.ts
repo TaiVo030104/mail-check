@@ -16,7 +16,6 @@ type SignInParams = {
 
 type SignUpParams = {
   username: string;
-  email: string;
   password: string;
 };
 
