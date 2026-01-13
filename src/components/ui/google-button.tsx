@@ -1,5 +1,6 @@
 import { Button } from './button';
 import { cn } from '@/lib/utils';
+import { API_BASE_URL } from '@/config/env';
 
 interface GoogleButtonProps {
   onClick?: () => void;
@@ -10,8 +11,7 @@ interface GoogleButtonProps {
 export function GoogleButton({ onClick, className, disabled }: GoogleButtonProps) {
   const handleGoogleLogin = () => {
     // Redirect to backend Google OAuth endpoint
-    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-    window.location.href = `${backendUrl}/auth/google`;
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (

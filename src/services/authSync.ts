@@ -49,6 +49,11 @@ class AuthSyncService {
       case "LOGIN":
         console.log("📡 [Multi-tab] Login detected from another tab");
         store.setAccessToken(message.accessToken);
+        // Schedule token refresh for this tab too
+        store.scheduleTokenRefresh(async () => {
+          const { refreshAccessToken } = await import("./apiClient");
+          await refreshAccessToken();
+        });
         // Redirect to home if we're on auth pages
         if (window.location.pathname === "/log-in" || window.location.pathname === "/sign-up") {
           window.location.href = "/";
@@ -58,6 +63,11 @@ class AuthSyncService {
       case "TOKEN_REFRESH":
         console.log("📡 [Multi-tab] Token refresh detected from another tab");
         store.setAccessToken(message.accessToken);
+        // Re-schedule token refresh for this tab with the new token
+        store.scheduleTokenRefresh(async () => {
+          const { refreshAccessToken } = await import("./apiClient");
+          await refreshAccessToken();
+        });
         break;
     }
   };

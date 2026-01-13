@@ -1,18 +1,5 @@
-import { EnumBandScore } from "./enums";
-import { EnumQuestion } from "./types/questions";
+import { ENABLE_GOOGLE_AUTH as GOOGLE_AUTH_ENABLED, ENABLE_GPT_5_1_CODEX_MAX as GPT_MAX_ENABLED } from "@/config/env";
 
-export const bandScores = {
-  [EnumBandScore.PRE_IELTS]: "Pre IELTS",
-  [EnumBandScore.BAND_45]: "Band 4.5",
-  [EnumBandScore.BAND_5]: "Band 5.0",
-  [EnumBandScore.BAND_55]: "Band 5.5",
-  [EnumBandScore.BAND_6]: "Band 6.0",
-  [EnumBandScore.BAND_65]: "Band 6.5",
-  [EnumBandScore.BAND_7]: "Band 7.0",
-};
-
-export const CONTENT_TYPE_OPTIONS = [
-  { value: EnumQuestion.MultipleChoice, label: "Multiple choice" },
-  { value: EnumQuestion.FillInTheBlank, label: "Fill in the blanks" },
-  { value: EnumQuestion.Matching, label: "Matching" },
-];
+// Feature flags - using centralized config with defaults
+export const ENABLE_GOOGLE_AUTH = GOOGLE_AUTH_ENABLED;
+export const ENABLE_GPT_5_1_CODEX_MAX = GPT_MAX_ENABLED;

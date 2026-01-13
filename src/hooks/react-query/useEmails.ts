@@ -31,10 +31,14 @@ export function useEmailsByFolder(
 }
 
 export function useEmailDetail(id: string) {
+  // Accept both Gmail IDs (16 chars hex) and MongoDB ObjectIds (24 chars hex)
+  // Just check that ID exists and is non-empty
+  const isValidId = Boolean(id && id.trim().length > 0);
+  
   return useQuery({
     queryKey: ['email', id],
     queryFn: () => emailService.getEmailById(id),
-    enabled: !!id,
+    enabled: isValidId,
     staleTime: 1000 * 60, // 1 minute - email content rarely changes
     gcTime: 1000 * 60 * 10, // Keep in cache longer for quick navigation
   });

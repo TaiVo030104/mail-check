@@ -33,22 +33,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     
     const token = state.accessToken;
-    if (!token) return;
+    if (!token) {
+      console.warn('⚠️ Cannot schedule token refresh: no token available');
+      return;
+    }
     
     const secondsUntilExpiry = getSecondsUntilExpiry(token);
     
-    // Refresh 60 seconds before expiry (or immediately if less than 60s left)
-    const refreshInSeconds = Math.max(0, secondsUntilExpiry - 60);
-    
-    if (secondsUntilExpiry > 0) {
-      const timer = setTimeout(async () => {
-        console.log("🔄 Silent token refresh triggered");
-        await onRefresh();
-      }, refreshInSeconds * 1000);
-      
-      set({ refreshTimer: timer });
-      console.log(`⏰ Token refresh scheduled in ${refreshInSeconds}s`);
+    // Token already expired or about to expire
+    if (secondsUntilExpiry <= 0) {
+      console.warn('⚠️ Token already expired, cannot schedule refresh');
+      return;
     }
+    
+    // Refresh 5 minutes (300s) before expiry for safety, or immediately if less than 5 min left
+    // This gives us plenty of time before the 15-minute token expires
+    const REFRESH_BUFFER_SECONDS = 300; // 5 minutes
+    const refreshInSeconds = Math.max(0, secondsUntilExpiry - REFRESH_BUFFER_SECONDS);
+    
+    const timer = setTimeout(async () => {
+      console.log('🔄 Silent token refresh triggered');
+      console.log(`⏰ Token was set to expire in ${secondsUntilExpiry}s`);
+      try {
+        await onRefresh();
+        console.log('✅ Token refreshed successfully');
+      } catch (error) {
+        console.error('❌ Token refresh failed:', error);
+      }
+    }, refreshInSeconds * 1000);
+    
+    set({ refreshTimer: timer });
+    const expiryMinutes = Math.floor(secondsUntilExpiry / 60);
+    const refreshMinutes = Math.floor(refreshInSeconds / 60);
+    console.log(`⏰ Token expires in ${expiryMinutes}m ${secondsUntilExpiry % 60}s`);
+    console.log(`⏰ Token refresh scheduled in ${refreshMinutes}m ${refreshInSeconds % 60}s`);
   },
   
   clearRefreshTimer: () => {

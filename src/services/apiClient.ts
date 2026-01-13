@@ -3,11 +3,11 @@ import { useAuthStore } from "@/hooks/useAuthStore";
 import { getRefreshToken, setRefreshToken, clearAllTokens } from "@/services/token";
 import { toast } from "@/hooks/use-toast";
 import { authSync } from "./authSync";
+import { API_BASE_URL, USE_COOKIE_AUTH } from "@/config/env";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-// Support for httpOnly cookies (backend sets cookies automatically)
-const USE_COOKIES = import.meta.env.VITE_USE_COOKIE_AUTH === "true";
+// Use centralized config with defaults
+const BASE_URL = API_BASE_URL;
+const USE_COOKIES = USE_COOKIE_AUTH;
 
 // axios instance used for regular API requests (will attach access token)
 const api: AxiosInstance = axios.create({
@@ -29,17 +29,29 @@ async function refreshAccessToken(): Promise<string | null> {
   
   // If using cookies, backend will automatically read from httpOnly cookie
   // If using localStorage, we need to send the token in the body
-  if (!USE_COOKIES && !refreshToken) return null;
+  console.log('🔍 Refresh token check:', {
+    useCookies: USE_COOKIES,
+    hasRefreshToken: !!refreshToken,
+    refreshTokenLength: refreshToken?.length || 0,
+  });
+  
+  if (!USE_COOKIES && !refreshToken) {
+    console.warn('⚠️ No refresh token available');
+    return null;
+  }
 
   if (isRefreshing && refreshPromise) {
+    console.log('🔄 Token refresh already in progress, waiting...');
     return refreshPromise;
   }
 
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
+      console.log('🔄 Refreshing access token...');
       // Send refreshToken only if not using cookies
       const payload = USE_COOKIES ? {} : { refreshToken };
+      console.log('📤 Sending refresh request with payload:', USE_COOKIES ? '{}' : '{ refreshToken: <token> }');
       const resp = await apiAuth.post("/refresh", payload);
       const data = resp.data as { accessToken: string; refreshToken?: string };
       const accessToken = data.accessToken;
@@ -58,8 +70,10 @@ async function refreshAccessToken(): Promise<string | null> {
       });
       // Broadcast token refresh to other tabs
       authSync.broadcastTokenRefresh(accessToken);
+      console.log('✅ Access token refreshed successfully');
       return accessToken;
     } catch (e) {
+      console.error('❌ Token refresh failed:', e);
       clearAllTokens();
       return null;
     } finally {
@@ -87,15 +101,21 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('🔐 Got 401, attempting token refresh...');
       originalRequest._retry = true;
       const newToken = await refreshAccessToken();
       if (newToken) {
+        console.log('✅ Token refreshed, retrying request');
         if (!originalRequest.headers) originalRequest.headers = {};
         originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
         return api(originalRequest);
       }
       // refresh failed: clear tokens (logout) and notify user
+      console.warn('❌ Token refresh failed, logging out');
       clearAllTokens();
+      const store = useAuthStore.getState();
+      store.clearAccessToken();
+      store.clearRefreshTimer();
       toast({
         title: "Session expired",
         description: "Please log in again.",

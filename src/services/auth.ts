@@ -3,6 +3,7 @@ import { setRefreshToken, clearAllTokens } from "./token";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { getErrorMessage } from "./error";
 import { authSync } from "./authSync";
+import { USE_COOKIE_AUTH } from "@/config/env";
 
 export type AuthInfo = {
   accessToken: string;
@@ -16,7 +17,6 @@ type SignInParams = {
 
 type SignUpParams = {
   username: string;
-  email: string;
   password: string;
 };
 
@@ -27,8 +27,7 @@ export type AuthUser = {
   picture?: string;
 };
 
-// Check if using cookie-based auth
-const USE_COOKIES = import.meta.env.VITE_USE_COOKIE_AUTH === "true";
+const USE_COOKIES = USE_COOKIE_AUTH;
 
 export const signIn = async (params: SignInParams) => {
   try {
