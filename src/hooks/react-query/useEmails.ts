@@ -32,7 +32,7 @@ export function useEmailsByFolder(
 
 export function useEmailDetail(id: string) {
   // Validate MongoDB ObjectId format (24-character hexadecimal string)
-  const isValidObjectId = id && /^[0-9a-fA-F]{24}$/.test(id);
+  const isValidObjectId = Boolean(id && /^[0-9a-fA-F]{24}$/.test(id));
   
   return useQuery({
     queryKey: ['email', id],
