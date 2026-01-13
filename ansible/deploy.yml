@@ -291,6 +291,21 @@
               depends_on:
                 - backend
           
+            dozzle:
+              image: amir20/dozzle:latest
+              container_name: {{ app_name }}-dozzle
+              restart: unless-stopped
+              ports:
+                - "127.0.0.1:8080:8080"
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock:ro
+              environment:
+                - DOZZLE_LEVEL=info
+                - DOZZLE_TAILSIZE=300
+                - DOZZLE_FILTER=name={{ app_name }}-.*
+              networks:
+                - {{ app_name }}-network
+          
           networks:
             {{ app_name }}-network:
               driver: bridge
