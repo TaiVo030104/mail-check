@@ -29,15 +29,20 @@ async function refreshAccessToken(): Promise<string | null> {
   
   // If using cookies, backend will automatically read from httpOnly cookie
   // If using localStorage, we need to send the token in the body
-  if (!USE_COOKIES && !refreshToken) return null;
+  if (!USE_COOKIES && !refreshToken) {
+    console.warn('⚠️ No refresh token available');
+    return null;
+  }
 
   if (isRefreshing && refreshPromise) {
+    console.log('🔄 Token refresh already in progress, waiting...');
     return refreshPromise;
   }
 
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
+      console.log('🔄 Refreshing access token...');
       // Send refreshToken only if not using cookies
       const payload = USE_COOKIES ? {} : { refreshToken };
       const resp = await apiAuth.post("/refresh", payload);
@@ -58,8 +63,10 @@ async function refreshAccessToken(): Promise<string | null> {
       });
       // Broadcast token refresh to other tabs
       authSync.broadcastTokenRefresh(accessToken);
+      console.log('✅ Access token refreshed successfully');
       return accessToken;
     } catch (e) {
+      console.error('❌ Token refresh failed:', e);
       clearAllTokens();
       return null;
     } finally {
@@ -87,15 +94,21 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('🔐 Got 401, attempting token refresh...');
       originalRequest._retry = true;
       const newToken = await refreshAccessToken();
       if (newToken) {
+        console.log('✅ Token refreshed, retrying request');
         if (!originalRequest.headers) originalRequest.headers = {};
         originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
         return api(originalRequest);
       }
       // refresh failed: clear tokens (logout) and notify user
+      console.warn('❌ Token refresh failed, logging out');
       clearAllTokens();
+      const store = useAuthStore.getState();
+      store.clearAccessToken();
+      store.clearRefreshTimer();
       toast({
         title: "Session expired",
         description: "Please log in again.",

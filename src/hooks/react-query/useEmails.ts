@@ -31,10 +31,13 @@ export function useEmailsByFolder(
 }
 
 export function useEmailDetail(id: string) {
+  // Validate MongoDB ObjectId format (24-character hexadecimal string)
+  const isValidObjectId = id && /^[0-9a-fA-F]{24}$/.test(id);
+  
   return useQuery({
     queryKey: ['email', id],
     queryFn: () => emailService.getEmailById(id),
-    enabled: !!id,
+    enabled: isValidObjectId,
     staleTime: 1000 * 60, // 1 minute - email content rarely changes
     gcTime: 1000 * 60 * 10, // Keep in cache longer for quick navigation
   });
