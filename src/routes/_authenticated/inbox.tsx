@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User } from "lucide-react";
+import { Database, LogOut, Mail, Menu, PenSquare, RefreshCw, Settings, Shield, User, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 // import { ThemeToggle } from '@/components/theme-toggle';
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AboutDialog } from "@/components/AboutDialog";
 import { ComposeDialog } from "@/components/pages/emails/compose-dialog";
 import { EmailBulkActions } from "@/components/pages/emails/email-bulk-actions";
 import { EmailDetail } from "@/components/pages/emails/email-detail";
@@ -50,6 +51,7 @@ function InboxPage() {
   const [allMatchingCount, setAllMatchingCount] = useState<number | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -455,6 +457,13 @@ function InboxPage() {
                 Keyboard Shortcuts
               </DropdownMenuItem>
               <DropdownMenuItem
+                onClick={() => setIsAboutOpen(true)}
+                className="cursor-pointer"
+              >
+                <Info className="mr-2 h-4 w-4" />
+                About
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onClick={handleSeedEmails}
                 disabled={seedEmailsMutation.isPending}
                 className="cursor-pointer"
@@ -636,6 +645,8 @@ function InboxPage() {
       <ComposeDialog open={isComposeOpen} onOpenChange={setIsComposeOpen} />
 
       <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onOpenChange={setIsKeyboardHelpOpen} />
+      
+      <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
     </div>
   );
 }
