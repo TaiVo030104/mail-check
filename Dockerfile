@@ -42,6 +42,7 @@ RUN apk upgrade --no-cache && \
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy the built app from the previous stage to nginx public directory
+# This includes dist/ which contains build-info.json from public/ folder
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration

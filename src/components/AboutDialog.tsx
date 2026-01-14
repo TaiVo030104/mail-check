@@ -150,31 +150,6 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     </div>
                   </>
                 )}
-
-                {frontendInfo.deployment && (
-                  <>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Deployed At
-                        </p>
-                        <p>{new Date(frontendInfo.deployment.deployedAt).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(frontendInfo.deployment.deployedAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Deployed By
-                        </p>
-                        <p>{frontendInfo.deployment.deployedBy}</p>
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Frontend info not available</p>
@@ -308,31 +283,6 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                             {new Date(backendInfo.git.date).toLocaleDateString()}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {backendInfo.deployment && (
-                  <>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Deployed At
-                        </p>
-                        <p>{new Date(backendInfo.deployment.deployedAt).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(backendInfo.deployment.deployedAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Deployed By
-                        </p>
-                        <p>{backendInfo.deployment.deployedBy}</p>
                       </div>
                     </div>
                   </>
