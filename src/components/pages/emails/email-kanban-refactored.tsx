@@ -191,17 +191,17 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     data: inboxData,
     isLoading: isInboxLoading,
     refetch: refetchInbox,
-  } = useEmailsByFolder("inbox", 1, 500, filters);
+  } = useEmailsByFolder("inbox", 1, 50, filters); // Reduced from 500 to 50
   const {
     data: archiveData,
     isLoading: isArchiveLoading,
     refetch: refetchArchive,
-  } = useEmailsByFolder("archive", 1, 500, filters);
+  } = useEmailsByFolder("archive", 1, 50, filters); // Reduced from 500 to 50
   const {
     data: snoozedData,
     isLoading: isSnoozedLoading,
     refetch: refetchSnoozed,
-  } = useEmailsByFolder("snoozed", 1, 500, filters);
+  } = useEmailsByFolder("snoozed", 1, 50, filters); // Reduced from 500 to 50
 
   const isLoading =
     isInboxLoading || isArchiveLoading || isSnoozedLoading || isBoardLoading || !boardData;
@@ -277,25 +277,28 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   }
 
   const getEmailsForColumn = (column: KanbanColumn): Email[] => {
-    // If we have board data with cards, use that for positioning
+    // Get emails from board cards FIRST (source of truth for Kanban positioning)
     if (boardData?.columns) {
       const boardColumn = boardData.columns.find((col) => col.id === column.id);
       if (boardColumn?.cards && boardColumn.cards.length > 0) {
-        // Get emails from board cards
+        // Get emails from board cards - these are emails explicitly added to Kanban
         const emailsFromCards = boardColumn.cards
           .map((card) => allEmails.find((e) => e.id === card.emailId))
           .filter((e): e is Email => e !== undefined);
         
-        if (emailsFromCards.length > 0) {
-          return emailsFromCards;
-        }
+        // Return ONLY emails that are in the board cards (no fallback)
+        // This ensures moved emails don't appear in multiple columns
+        return emailsFromCards;
       }
     }
     
-    // Fallback to label-based filtering (for emails not yet in board)
+    // If no board cards exist for this column, show emails based on labels
+    // This handles: 1) First load before any email is added to board
+    //               2) New emails coming from Gmail with matching labels
     let emails: Email[] = [];
 
     if (column.id === "inbox") {
+      // Inbox: emails WITHOUT any Kanban labels
       emails = allEmails.filter(
         (email) =>
           email.folder === "inbox" &&
@@ -309,6 +312,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
         (email) => email.labels?.includes("snoozed") || !!email.snoozeUntil,
       );
     } else {
+      // Other columns: filter by label
       emails = allEmails.filter((email) => email.labels?.includes(column.label));
     }
 
@@ -357,9 +361,21 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
           refetchSnoozed();
           refetchBoard();
           
+          const targetColumn = kanbanColumns.find((c) => c.id === toColumn)?.title;
+          const providerType = boardData?.providerType;
+          
+          let description = `Moved to ${targetColumn}`;
+          if (providerType === 'gmail' && data.synced) {
+            description += ' ✓ Gmail label synced';
+          } else if (providerType === 'database') {
+            description += ' ✓ Label saved locally';
+          } else if (providerType === 'imap') {
+            description += ' (tracked in board only)';
+          }
+          
           toast({
             title: "Email moved",
-            description: `Moved to ${kanbanColumns.find((c) => c.id === toColumn)?.title}${data.synced ? ' (Gmail synced)' : ''}`,
+            description,
           });
         },
         onError: () => {
@@ -444,6 +460,13 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {boardData?.providerType && (
+            <Badge variant={boardData.providerType === 'gmail' ? 'default' : 'secondary'} className="text-xs">
+              {boardData.providerType === 'gmail' ? '📧 Gmail' : 
+               boardData.providerType === 'imap' ? '📬 IMAP' : 
+               '💾 Local'}
+            </Badge>
+          )}
           <Button variant="outline" size="sm" onClick={() => setShowColumnManager(true)}>
             <Settings className="mr-2 size-4" />
             Manage Columns

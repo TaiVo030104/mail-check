@@ -19,6 +19,7 @@ export interface KanbanCard {
 }
 
 export interface KanbanBoard {
+  providerType: 'gmail' | 'imap' | 'database';
   columns: KanbanColumn[];
 }
 
