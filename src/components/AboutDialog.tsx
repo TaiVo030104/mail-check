@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, GitBranch, Clock, User, Server, Activity, Copy, Check } from 'lucide-react';
+import { Info, GitBranch, Server, Activity, Copy, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
