@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { getSecondsUntilExpiry } from "@/services/jwt";
 
+const ACCESS_TOKEN_KEY = "auth_access_token";
+
 interface AuthState {
   accessToken: string | null;
   refreshTimer: NodeJS.Timeout | null;
@@ -8,18 +10,33 @@ interface AuthState {
   clearAccessToken: () => void;
   scheduleTokenRefresh: (onRefresh: () => Promise<void>) => void;
   clearRefreshTimer: () => void;
+  initializeFromStorage: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   refreshTimer: null,
   
-  setAccessToken: (token: string) => set({ accessToken: token }),
+  setAccessToken: (token: string) => {
+    // Save to localStorage for persistence
+    try {
+      localStorage.setItem(ACCESS_TOKEN_KEY, token);
+    } catch (e) {
+      console.warn("Failed to save access token to localStorage:", e);
+    }
+    set({ accessToken: token });
+  },
   
   clearAccessToken: () => {
     const state = get();
     if (state.refreshTimer) {
       clearTimeout(state.refreshTimer);
+    }
+    // Remove from localStorage
+    try {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+    } catch (e) {
+      console.warn("Failed to remove access token from localStorage:", e);
     }
     set({ accessToken: null, refreshTimer: null });
   },
@@ -74,6 +91,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (state.refreshTimer) {
       clearTimeout(state.refreshTimer);
       set({ refreshTimer: null });
+    }
+  },
+  
+  initializeFromStorage: () => {
+    try {
+      const savedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (savedToken) {
+        console.log("🔄 Restoring access token from localStorage");
+        set({ accessToken: savedToken });
+      }
+    } catch (e) {
+      console.warn("Failed to restore access token from localStorage:", e);
     }
   },
 }));
