@@ -23,12 +23,17 @@ COPY . .
 # Override with --build-arg VITE_API_BASE_URL=https://your-domain.com/api in production
 ARG VITE_API_BASE_URL=http://localhost:3000
 ARG VITE_USE_COOKIE_AUTH=false
+ARG VITE_ENABLE_GOOGLE_AUTH=true
+ARG VITE_ENABLE_GPT5_1_CODEX_MAX=true
 
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_USE_COOKIE_AUTH=${VITE_USE_COOKIE_AUTH}
+ENV VITE_ENABLE_GOOGLE_AUTH=${VITE_ENABLE_GOOGLE_AUTH}
+ENV VITE_ENABLE_GPT5_1_CODEX_MAX=${VITE_ENABLE_GPT5_1_CODEX_MAX}
 
 # Build the application
 RUN echo "Building with VITE_API_BASE_URL=${VITE_API_BASE_URL}"
+RUN echo "Building with VITE_USE_COOKIE_AUTH=${VITE_USE_COOKIE_AUTH}"
 RUN pnpm run build
 
 # Stage 2: Production stage with nginx
