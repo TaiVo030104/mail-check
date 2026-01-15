@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, GitBranch, Clock, User, Server, Activity, Copy, Check } from 'lucide-react';
+import { Info, GitBranch, Server, Activity, Copy, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ interface AboutDialogProps {
 
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
   const { data: frontendInfo, isLoading: frontendLoading } = useFrontendInfo();
-  const { data: backendInfo, isLoading: backendLoading } = useBackendInfo();
+  const { data: backendInfo, isLoading: backendLoading, isError: backendError } = useBackendInfo();
   const [copiedFrontend, setCopiedFrontend] = useState(false);
   const [copiedBackend, setCopiedBackend] = useState(false);
 
@@ -67,9 +67,17 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                 Frontend
               </h3>
               {frontendInfo && (
-                <Badge variant={frontendInfo.environment === 'production' ? 'default' : 'secondary'}>
-                  {frontendInfo.environment}
-                </Badge>
+                <div className="flex gap-2">
+                  {frontendInfo.git && frontendInfo.git.commitShort !== 'unknown' && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      <GitBranch className="h-3 w-3 mr-1" />
+                      {frontendInfo.git.commitShort}
+                    </Badge>
+                  )}
+                  <Badge variant={frontendInfo.environment === 'production' ? 'default' : 'secondary'}>
+                    {frontendInfo.environment}
+                  </Badge>
+                </div>
               )}
             </div>
 
@@ -83,6 +91,10 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     <p className="text-sm font-mono">{frontendInfo.version}</p>
                   </div>
                   <div>
+                    <p className="text-xs text-muted-foreground">Environment</p>
+                    <p className="text-sm font-mono">{frontendInfo.environment}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-muted-foreground">Build Time</p>
                     <p className="text-sm">
                       {new Date(frontendInfo.buildTime).toLocaleString()}
@@ -91,22 +103,16 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                       {formatDistanceToNow(new Date(frontendInfo.buildTime), { addSuffix: true })}
                     </p>
                   </div>
-                </div>
-
-                {frontendInfo.git && frontendInfo.git.commit !== 'unknown' && (
-                  <>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold flex items-center gap-1">
-                          <GitBranch className="h-3 w-3" />
-                          Git Information
-                        </p>
+                  {frontendInfo.git && frontendInfo.git.commitShort !== 'unknown' && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Commit</p>
+                      <p className="text-sm font-mono flex items-center gap-2">
+                        {frontendInfo.git.commitShort}
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => copyToClipboard(frontendInfo.git.commit, 'frontend')}
-                          className="h-7"
+                          className="h-5 w-5 p-0"
                         >
                           {copiedFrontend ? (
                             <Check className="h-3 w-3 text-green-500" />
@@ -114,53 +120,32 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                             <Copy className="h-3 w-3" />
                           )}
                         </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      </p>
+                      <p className="text-xs text-muted-foreground">{frontendInfo.git.branch}</p>
+                    </div>
+                  )}
+                </div>
+
+                {frontendInfo.git && frontendInfo.git.commit !== 'unknown' && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold">Last Commit</p>
+                      <div className="text-sm space-y-1">
                         <div>
-                          <span className="text-muted-foreground">Branch:</span>{' '}
-                          <code className="font-mono">{frontendInfo.git.branch}</code>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Commit:</span>{' '}
-                          <code className="font-mono">{frontendInfo.git.commitShort}</code>
-                        </div>
-                        <div className="col-span-2">
                           <span className="text-muted-foreground">Message:</span>{' '}
                           <span className="italic">{frontendInfo.git.message}</span>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Author:</span>{' '}
-                          {frontendInfo.git.author}
+                        <div className="flex gap-4">
+                          <div>
+                            <span className="text-muted-foreground">Author:</span>{' '}
+                            {frontendInfo.git.author}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Date:</span>{' '}
+                            {new Date(frontendInfo.git.date).toLocaleDateString()}
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Date:</span>{' '}
-                          {new Date(frontendInfo.git.date).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {frontendInfo.deployment && (
-                  <>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Deployed At
-                        </p>
-                        <p>{new Date(frontendInfo.deployment.deployedAt).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(frontendInfo.deployment.deployedAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Deployed By
-                        </p>
-                        <p>{frontendInfo.deployment.deployedBy}</p>
                       </div>
                     </div>
                   </>
@@ -182,6 +167,12 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               </h3>
               {backendInfo && (
                 <div className="flex gap-2">
+                  {backendInfo.git && backendInfo.git.commitShort !== 'unknown' && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      <GitBranch className="h-3 w-3 mr-1" />
+                      {backendInfo.git.commitShort}
+                    </Badge>
+                  )}
                   <Badge variant={backendInfo.status === 'running' ? 'default' : 'destructive'}>
                     {backendInfo.status}
                   </Badge>
@@ -193,7 +184,14 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
             </div>
 
             {backendLoading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <div className="space-y-2 rounded-lg border p-4">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                  <div className="h-4 bg-muted rounded w-2/3"></div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Connecting to backend...</p>
+              </div>
             ) : backendInfo ? (
               <div className="space-y-2 rounded-lg border p-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -202,8 +200,8 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     <p className="text-sm font-mono">{backendInfo.version}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Uptime</p>
-                    <p className="text-sm">{formatUptime(backendInfo.uptime)}</p>
+                    <p className="text-xs text-muted-foreground">Environment</p>
+                    <p className="text-sm font-mono">{backendInfo.environment}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Build Time</p>
@@ -213,6 +211,35 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(backendInfo.buildTime), { addSuffix: true })}
                     </p>
+                  </div>
+                  {backendInfo.git && backendInfo.git.commitShort !== 'unknown' && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Commit</p>
+                      <p className="text-sm font-mono flex items-center gap-2">
+                        {backendInfo.git.commitShort}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(backendInfo.git.commit, 'backend')}
+                          className="h-5 w-5 p-0"
+                        >
+                          {copiedBackend ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{backendInfo.git.branch}</p>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Uptime</p>
+                    <p className="text-sm">{formatUptime(backendInfo.uptime)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Node Version</p>
@@ -240,69 +267,36 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                   <>
                     <Separator />
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold flex items-center gap-1">
-                          <GitBranch className="h-3 w-3" />
-                          Git Information
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(backendInfo.git.commit, 'backend')}
-                          className="h-7"
-                        >
-                          {copiedBackend ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <p className="text-xs font-semibold">Last Commit</p>
+                      <div className="text-sm space-y-1">
                         <div>
-                          <span className="text-muted-foreground">Branch:</span>{' '}
-                          <code className="font-mono">{backendInfo.git.branch}</code>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Commit:</span>{' '}
-                          <code className="font-mono">{backendInfo.git.commitShort}</code>
-                        </div>
-                        <div className="col-span-2">
                           <span className="text-muted-foreground">Message:</span>{' '}
                           <span className="italic">{backendInfo.git.message}</span>
                         </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {backendInfo.deployment && (
-                  <>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Deployed At
-                        </p>
-                        <p>{new Date(backendInfo.deployment.deployedAt).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(backendInfo.deployment.deployedAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Deployed By
-                        </p>
-                        <p>{backendInfo.deployment.deployedBy}</p>
+                        <div className="flex gap-4">
+                          <div>
+                            <span className="text-muted-foreground">Author:</span>{' '}
+                            {backendInfo.git.author}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Date:</span>{' '}
+                            {new Date(backendInfo.git.date).toLocaleDateString()}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
                 )}
               </div>
+            ) : backendError ? (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                <p className="text-sm font-semibold text-destructive">⚠️ Backend Connection Failed</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Unable to connect to backend server. Please check if the backend is running.
+                </p>
+              </div>
             ) : (
-              <p className="text-sm text-destructive">Backend is not responding</p>
+              <p className="text-sm text-muted-foreground">Backend info not available</p>
             )}
           </div>
         </div>

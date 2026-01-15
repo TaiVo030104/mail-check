@@ -1,11 +1,12 @@
 import { useEmailDetail, useToggleStar, useMarkAsRead, useDeleteEmail, useDownloadAttachment } from '@/hooks/react-query/useEmails';
 import { Button } from '@/components/ui/button';
-import { Loader2, Star, Reply, ReplyAll, Forward, Trash2, Mail, X, ArrowLeft, Paperclip, Download, FileIcon, Clock, Sparkles } from 'lucide-react';
+import { Loader2, Star, Reply, ReplyAll, Forward, Trash2, Mail, X, ArrowLeft, Paperclip, Download, FileIcon, Clock, Sparkles, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { ComposeDialog, ComposeMode } from './compose-dialog';
 import { SnoozeDialog } from './snooze-dialog';
 import { AiSummaryDialog } from './ai-summary-dialog';
+import { AttachmentPreview } from '@/components/AttachmentPreview';
 import { useState } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 
@@ -131,6 +132,14 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
   const handleForward = () => {
     setComposeMode("forward");
     setComposeOpen(true);
+  };
+
+  const handleOpenInGmail = () => {
+    if (email?.gmailMessageId) {
+      // Open Gmail message in a new tab using the Gmail message ID
+      const gmailUrl = `https://mail.google.com/mail/u/0/#all/${email.gmailMessageId}`;
+      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   if (isLoading) {
@@ -268,6 +277,18 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
             <span className="hidden lg:inline">Delete</span>
           </Button>
+          {email.gmailMessageId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInGmail}
+              className="gap-1.5 text-xs md:text-sm h-8 md:h-9"
+              aria-label="Open in Gmail"
+            >
+              <ExternalLink className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden lg:inline">Open in Gmail</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -299,22 +320,36 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleDownloadAttachment(
-                attachment.id || attachment.attachmentId,
-                attachment.filename || attachment.originalName
-              )}
-              disabled={downloadAttachmentMutation.isPending}
-              title="Download"
-            >
-              {downloadAttachmentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex items-center gap-1">
+              <AttachmentPreview
+                attachmentId={attachment.id || attachment.attachmentId}
+                filename={attachment.filename || attachment.originalName}
+                mimeType={attachment.mimeType}
+                size={attachment.size}
+                emailId={email.id}
+                onDownload={() => handleDownloadAttachment(
+                  attachment.id || attachment.attachmentId,
+                  attachment.filename || attachment.originalName
+                )}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleDownloadAttachment(
+                  attachment.id || attachment.attachmentId,
+                  attachment.filename || attachment.originalName
+                )}
+                disabled={downloadAttachmentMutation.isPending}
+                title="Download"
+              >
+                {downloadAttachmentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         ))}
       </div>

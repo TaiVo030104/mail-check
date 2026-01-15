@@ -71,5 +71,7 @@ export function useBackendInfo() {
     queryKey: ['backendInfo'],
     queryFn: fetchBackendInfo,
     staleTime: 60000, // Refetch every minute for uptime
+    retry: 2, // Retry only 2 times instead of default 3
+    retryDelay: 1000, // Wait 1 second between retries
   });
 }

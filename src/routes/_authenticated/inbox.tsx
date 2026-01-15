@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 // import { ThemeToggle } from '@/components/theme-toggle';
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AboutDialog } from "@/components/AboutDialog";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ComposeDialog } from "@/components/pages/emails/compose-dialog";
 import { EmailBulkActions } from "@/components/pages/emails/email-bulk-actions";
 import { EmailDetail } from "@/components/pages/emails/email-detail";
@@ -14,6 +15,7 @@ import { EmailList } from "@/components/pages/emails/email-list";
 import { KeyboardShortcutsHelp } from "@/components/pages/emails/keyboard-shortcuts-help";
 import { MailboxSidebar } from "@/components/pages/emails/mailbox-sidebar";
 import { UnifiedSearchBar } from "@/components/pages/emails/unified-search-bar";
+import { EmailAccountSettings } from "@/components/pages/emails/EmailAccountSettings";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -52,6 +54,7 @@ function InboxPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -327,6 +330,9 @@ function InboxPage() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      {/* Offline/Online Indicator */}
+      <OfflineIndicator />
+      
       {/* Top Navigation Bar */}
       <header
         className="flex h-14 items-center justify-between border-b bg-background px-3 md:h-16 md:px-4"
@@ -441,11 +447,11 @@ function InboxPage() {
                 View Profile
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => (window.location.href = "/settings")}
+                onClick={() => setIsSettingsOpen(true)}
                 className="cursor-pointer"
               >
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                Email Accounts
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setIsKeyboardHelpOpen(true)}
@@ -647,6 +653,8 @@ function InboxPage() {
       <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onOpenChange={setIsKeyboardHelpOpen} />
       
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
+      
+      <EmailAccountSettings open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }

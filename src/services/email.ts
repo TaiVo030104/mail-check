@@ -44,12 +44,14 @@ export interface Email {
   snoozedAt?: string;
   aiSummary?: string;
   summarizedAt?: string;
+  gmailMessageId?: string; // Gmail message ID for "Open in Gmail" feature
 }
 
 export interface EmailDetail extends Email {
   body: string;
   readAt: string;
   attachments?: Attachment[];
+  cc?: string;
 }
 
 export interface EmailListResponse {
