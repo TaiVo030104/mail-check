@@ -1,8 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Eye, Download, X } from "lucide-react";
-import { useState } from "react";
+import { Download, Eye, X } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface AttachmentPreviewProps {
   attachmentId: string;
@@ -17,7 +18,6 @@ export function AttachmentPreview({
   attachmentId,
   filename,
   mimeType,
-  size,
   emailId,
   onDownload,
 }: AttachmentPreviewProps) {
@@ -29,13 +29,13 @@ export function AttachmentPreview({
   // Determine if file can be previewed
   const isPreviewable = () => {
     if (!mimeType) return false;
-    
+
     // Images
     if (mimeType.startsWith("image/")) return true;
-    
+
     // PDF
     if (mimeType === "application/pdf") return true;
-    
+
     // Text files
     if (
       mimeType.startsWith("text/") ||
@@ -44,7 +44,7 @@ export function AttachmentPreview({
     ) {
       return true;
     }
-    
+
     return false;
   };
 
@@ -61,9 +61,9 @@ export function AttachmentPreview({
       if (emailId) {
         params.append("emailId", emailId);
       }
-      
+
       const url = `/emails/attachments/${attachmentId}/download?${params.toString()}`;
-      
+
       // Fetch the file as blob
       const response = await fetch(url, {
         headers: {
@@ -98,15 +98,15 @@ export function AttachmentPreview({
   const renderPreview = () => {
     if (loading) {
       return (
-        <div className="flex items-center justify-center h-[500px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex h-[500px] items-center justify-center">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="flex items-center justify-center h-[500px]">
+        <div className="flex h-[500px] items-center justify-center">
           <p className="text-destructive">{error}</p>
         </div>
       );
@@ -117,12 +117,8 @@ export function AttachmentPreview({
     // Image preview
     if (mimeType?.startsWith("image/")) {
       return (
-        <div className="flex items-center justify-center max-h-[600px] overflow-auto bg-muted/20 rounded-lg p-4">
-          <img 
-            src={previewUrl} 
-            alt={filename} 
-            className="max-w-full h-auto object-contain"
-          />
+        <div className="flex max-h-[600px] items-center justify-center overflow-auto rounded-lg bg-muted/20 p-4">
+          <img src={previewUrl} alt={filename} className="h-auto max-w-full object-contain" />
         </div>
       );
     }
@@ -132,21 +128,21 @@ export function AttachmentPreview({
       return (
         <iframe
           src={previewUrl}
-          className="w-full h-[600px] border-0 rounded-lg"
+          className="h-[600px] w-full rounded-lg border-0"
           title={filename}
         />
       );
     }
 
     // Text preview
-    if (mimeType?.startsWith("text/") || mimeType === "application/json" || mimeType === "application/xml") {
+    if (
+      mimeType?.startsWith("text/") ||
+      mimeType === "application/json" ||
+      mimeType === "application/xml"
+    ) {
       return (
-        <div className="max-h-[600px] overflow-auto bg-muted/20 rounded-lg p-4">
-          <iframe
-            src={previewUrl}
-            className="w-full h-[550px] border-0"
-            title={filename}
-          />
+        <div className="max-h-[600px] overflow-auto rounded-lg bg-muted/20 p-4">
+          <iframe src={previewUrl} className="h-[550px] w-full border-0" title={filename} />
         </div>
       );
     }
@@ -164,43 +160,29 @@ export function AttachmentPreview({
         variant="ghost"
         size="sm"
         onClick={handlePreview}
-        className="h-8 w-8 p-0"
+        className="size-8 p-0"
         title="Preview"
       >
-        <Eye className="h-4 w-4" />
+        <Eye className="size-4" />
       </Button>
 
       <Dialog open={previewOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-lg font-semibold truncate pr-4">
-                {filename}
-              </DialogTitle>
+              <DialogTitle className="truncate pr-4 text-lg font-semibold">{filename}</DialogTitle>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onDownload}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={onDownload} className="gap-2">
+                  <Download className="size-4" />
                   Download
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClose}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
+                <Button variant="ghost" size="sm" onClick={handleClose} className="size-8 p-0">
+                  <X className="size-4" />
                 </Button>
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            {renderPreview()}
-          </div>
+          <div className="flex-1 overflow-auto">{renderPreview()}</div>
         </DialogContent>
       </Dialog>
     </>

@@ -1,23 +1,32 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import { useEmailsByFolder } from "@/hooks/react-query/useEmails";
-import { useKanbanBoard, useCreateColumn, useUpdateColumn, useDeleteColumn, useMoveCard } from "@/hooks/react-query/useKanban";
-import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Email } from "@/services/email";
-import { EmailFilterValues } from "./email-filters";
-import { EmailDetail } from "./email-detail";
-import { SnoozeDialog } from "./snooze-dialog";
-import { KanbanColumnManager } from "./kanban-column-manager";
 import { format } from "date-fns";
 import { Loader2, RefreshCcw, Settings, Sparkles } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+
+import { SnoozeCountdown } from "@/components/SnoozeCountdown";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useEmailsByFolder } from "@/hooks/react-query/useEmails";
+import {
+  useCreateColumn,
+  useDeleteColumn,
+  useKanbanBoard,
+  useMoveCard,
+  useUpdateColumn,
+} from "@/hooks/react-query/useKanban";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Email } from "@/services/email";
+
+import { EmailDetail } from "./email-detail";
+import { EmailFilterValues } from "./email-filters";
+import { KanbanColumnManager } from "./kanban-column-manager";
+import { SnoozeDialog } from "./snooze-dialog";
 
 const DND_TYPE = "EMAIL_CARD";
 
@@ -93,7 +102,7 @@ function EmailCard({ email, columnId, onCardClick }: EmailCardProps) {
       ref={drag}
       className={cn(
         "w-full cursor-move border bg-background p-2 shadow-sm transition-opacity will-change-transform md:p-3",
-        isDragging ? "opacity-50" : "opacity-100",
+        isDragging ? "opacity-50" : "opacity-100"
       )}
       onClick={() => onCardClick(email.id)}
     >
@@ -104,17 +113,19 @@ function EmailCard({ email, columnId, onCardClick }: EmailCardProps) {
         <span className="line-clamp-1">From: {email.from}</span>
       </div>
       {email.preview && (
-        <div className="mt-1 text-[10px] text-muted-foreground/80 md:text-xs line-clamp-2">
+        <div className="mt-1 line-clamp-2 text-[10px] text-muted-foreground/80 md:text-xs">
           {email.preview}
         </div>
       )}
       {email.aiSummary && (
-        <div className="mt-2 rounded-md bg-purple-50 dark:bg-purple-950/20 p-2 border border-purple-200 dark:border-purple-800">
-          <div className="flex items-start gap-1 mb-1">
-            <Sparkles className="h-3 w-3 text-purple-500 flex-shrink-0 mt-0.5" />
-            <span className="text-[9px] md:text-[10px] font-medium text-purple-700 dark:text-purple-400">AI Summary</span>
+        <div className="mt-2 rounded-md border border-purple-200 bg-purple-50 p-2 dark:border-purple-800 dark:bg-purple-950/20">
+          <div className="mb-1 flex items-start gap-1">
+            <Sparkles className="mt-0.5 size-3 shrink-0 text-purple-500" />
+            <span className="text-[9px] font-medium text-purple-700 dark:text-purple-400 md:text-[10px]">
+              AI Summary
+            </span>
           </div>
-          <p className="text-[9px] md:text-[10px] text-purple-900/80 dark:text-purple-100/80 line-clamp-2">
+          <p className="line-clamp-2 text-[9px] text-purple-900/80 dark:text-purple-100/80 md:text-[10px]">
             {email.aiSummary}
           </p>
         </div>
@@ -138,7 +149,12 @@ interface KanbanColumnComponentProps {
   onMove: (emailId: string, fromColumn: string, toColumn: string) => void;
 }
 
-function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanColumnComponentProps) {
+function KanbanColumnComponent({
+  column,
+  emails,
+  onCardClick,
+  onMove,
+}: KanbanColumnComponentProps) {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: DND_TYPE,
     drop: (item: DragItem) => {
@@ -155,9 +171,9 @@ function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanCo
     <div
       ref={drop}
       className={cn(
-        "flex min-h-[400px] max-h-[calc(100vh-200px)] flex-col rounded-lg border p-2 transition-colors md:p-3",
+        "flex max-h-[calc(100vh-200px)] min-h-[400px] flex-col rounded-lg border p-2 transition-colors md:p-3",
         "min-w-[280px] flex-shrink-0 md:min-w-0",
-        bgClass,
+        bgClass
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -167,7 +183,7 @@ function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanCo
             <p className="truncate text-xs text-muted-foreground">{column.description}</p>
           ) : null}
         </div>
-        <Badge variant="secondary" className="flex-shrink-0">
+        <Badge variant="secondary" className="shrink-0">
           {emails.length}
         </Badge>
       </div>
@@ -179,7 +195,12 @@ function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanCo
           </div>
         ) : (
           emails.map((email) => (
-            <EmailCard key={email.id} email={email} columnId={column.id} onCardClick={onCardClick} />
+            <EmailCard
+              key={email.id}
+              email={email}
+              columnId={column.id}
+              onCardClick={onCardClick}
+            />
           ))
         )}
       </div>
@@ -187,7 +208,11 @@ function KanbanColumnComponent({ column, emails, onCardClick, onMove }: KanbanCo
   );
 }
 
-export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: EmailKanbanProps): JSX.Element {
+export function EmailKanbanRefactored({
+  filters,
+  searchEmails,
+  onBackToEmail,
+}: EmailKanbanProps): JSX.Element {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [pendingSnooze, setPendingSnooze] = useState<{
     emailId: string;
@@ -203,12 +228,28 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
   const createColumnMutation = useCreateColumn();
   const updateColumnMutation = useUpdateColumn();
   const deleteColumnMutation = useDeleteColumn();
-  
+
+  const {
+    data: inboxData,
+    isLoading: isInboxLoading,
+    refetch: refetchInbox,
+  } = useEmailsByFolder("inbox", 1, 50, filters);
+  const {
+    data: archiveData,
+    isLoading: isArchiveLoading,
+    refetch: refetchArchive,
+  } = useEmailsByFolder("archive", 1, 50, filters);
+  const {
+    data: snoozedData,
+    isLoading: isSnoozedLoading,
+    refetch: refetchSnoozed,
+  } = useEmailsByFolder("snoozed", 1, 50, filters);
+
   // Force refresh board on mount to get latest data
   useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ['kanban', 'board'] });
+    queryClient.invalidateQueries({ queryKey: ["kanban", "board"] });
     refetchBoard();
-  }, []);
+  }, [queryClient, refetchBoard]);
 
   // Auto-refresh polling every 60 seconds for snoozed emails
   useEffect(() => {
@@ -220,22 +261,6 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
 
     return () => clearInterval(intervalId);
   }, [refetchSnoozed, refetchInbox]);
-
-  const {
-    data: inboxData,
-    isLoading: isInboxLoading,
-    refetch: refetchInbox,
-  } = useEmailsByFolder("inbox", 1, 50, filters); // Reduced from 500 to 50
-  const {
-    data: archiveData,
-    isLoading: isArchiveLoading,
-    refetch: refetchArchive,
-  } = useEmailsByFolder("archive", 1, 50, filters); // Reduced from 500 to 50
-  const {
-    data: snoozedData,
-    isLoading: isSnoozedLoading,
-    refetch: refetchSnoozed,
-  } = useEmailsByFolder("snoozed", 1, 50, filters); // Reduced from 500 to 50
 
   const isLoading =
     isInboxLoading || isArchiveLoading || isSnoozedLoading || isBoardLoading || !boardData;
@@ -254,7 +279,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
           id: col.id,
           title: col.title,
           // Use label from backend first, fallback to default, or use col.id as last resort
-          label: (col as any).label ?? col.id ?? fallback?.label ?? "",
+          label: (col as { label?: string }).label ?? col.id ?? fallback?.label ?? "",
           description: col.description,
         };
       });
@@ -267,46 +292,40 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     ...(archiveData?.emails || []),
     ...(snoozedData?.emails || []),
   ];
-  
+
   // Apply filters to search results if searching
   if (searchEmails && filters) {
     allEmails = [...searchEmails];
-    
+
     // Apply read/unread filter
     if (filters.unread !== undefined) {
-      allEmails = allEmails.filter(email => email.isRead !== filters.unread);
+      allEmails = allEmails.filter((email) => email.isRead !== filters.unread);
     }
-    
+
     // Apply starred filter
     if (filters.starred !== undefined) {
-      allEmails = allEmails.filter(email => email.isStarred === filters.starred);
+      allEmails = allEmails.filter((email) => email.isStarred === filters.starred);
     }
-    
+
     // Apply has attachments filter
     if (filters.hasAttachments !== undefined) {
-      allEmails = allEmails.filter(email => email.hasAttachments === filters.hasAttachments);
+      allEmails = allEmails.filter((email) => email.hasAttachments === filters.hasAttachments);
     }
-    
+
     // Apply from/sender filter
     if (filters.from?.trim()) {
       const fromLower = filters.from.toLowerCase();
-      allEmails = allEmails.filter(email => 
-        email.from.toLowerCase().includes(fromLower)
-      );
+      allEmails = allEmails.filter((email) => email.from.toLowerCase().includes(fromLower));
     }
-    
+
     // Apply date range filter
     if (filters.startDate) {
-      allEmails = allEmails.filter(email => 
-        new Date(email.sentAt) >= filters.startDate!
-      );
+      allEmails = allEmails.filter((email) => new Date(email.sentAt) >= filters.startDate!);
     }
     if (filters.endDate) {
       const endOfDay = new Date(filters.endDate);
       endOfDay.setHours(23, 59, 59, 999);
-      allEmails = allEmails.filter(email => 
-        new Date(email.sentAt) <= endOfDay
-      );
+      allEmails = allEmails.filter((email) => new Date(email.sentAt) <= endOfDay);
     }
   }
 
@@ -319,13 +338,13 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
         const emailsFromCards = boardColumn.cards
           .map((card) => allEmails.find((e) => e.id === card.emailId))
           .filter((e): e is Email => e !== undefined);
-        
+
         // Return ONLY emails that are in the board cards (no fallback)
         // This ensures moved emails don't appear in multiple columns
         return emailsFromCards;
       }
     }
-    
+
     // If no board cards exist for this column, show emails based on labels
     // This handles: 1) First load before any email is added to board
     //               2) New emails coming from Gmail with matching labels
@@ -339,11 +358,11 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
           !email.labels?.includes("todo") &&
           !email.labels?.includes("in-progress") &&
           !email.labels?.includes("done") &&
-          !email.labels?.includes("snoozed"),
+          !email.labels?.includes("snoozed")
       );
     } else if (column.id === "snoozed") {
       emails = allEmails.filter(
-        (email) => email.labels?.includes("snoozed") || !!email.snoozeUntil,
+        (email) => email.labels?.includes("snoozed") || !!email.snoozeUntil
       );
     } else {
       // Other columns: filter by label
@@ -381,11 +400,11 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
 
     // Use Kanban API to move card (will sync with Gmail if applicable)
     moveCardMutation.mutate(
-      { 
-        emailId, 
-        fromColumn, 
+      {
+        emailId,
+        fromColumn,
         toColumn,
-        position: 0 // Add to top of column
+        position: 0, // Add to top of column
       },
       {
         onSuccess: (data) => {
@@ -394,19 +413,19 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
           refetchArchive();
           refetchSnoozed();
           refetchBoard();
-          
+
           const targetColumn = kanbanColumns.find((c) => c.id === toColumn)?.title;
           const providerType = boardData?.providerType;
-          
+
           let description = `Moved to ${targetColumn}`;
-          if (providerType === 'gmail' && data.synced) {
-            description += ' ✓ Gmail label synced';
-          } else if (providerType === 'database') {
-            description += ' ✓ Label saved locally';
-          } else if (providerType === 'imap') {
-            description += ' (tracked in board only)';
+          if (providerType === "gmail" && data.synced) {
+            description += " ✓ Gmail label synced";
+          } else if (providerType === "database") {
+            description += " ✓ Label saved locally";
+          } else if (providerType === "imap") {
+            description += " (tracked in board only)";
           }
-          
+
           toast({
             title: "Email moved",
             description,
@@ -419,7 +438,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
             variant: "destructive",
           });
         },
-      },
+      }
     );
   };
 
@@ -445,23 +464,20 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
       position: kanbanColumns.length,
       label: column.label,
     };
-    
-    createColumnMutation.mutate(
-      newColumnData,
-      {
-        onSuccess: () => {
-          refetchBoard();
-          setShowColumnManager(false);
-        },
-        onError: (error) => {
-          console.error('Error creating column:', error);
-        },
-      }
-    );
+
+    createColumnMutation.mutate(newColumnData, {
+      onSuccess: () => {
+        refetchBoard();
+        setShowColumnManager(false);
+      },
+      onError: (error) => {
+        console.error("Error creating column:", error);
+      },
+    });
   };
 
   const handleUpdateColumn = (id: string, updates: Partial<KanbanColumn>) => {
-    const payload: any = {};
+    const payload: Record<string, unknown> = {};
     if (updates.title !== undefined) payload.title = updates.title;
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.label !== undefined) payload.label = updates.label;
@@ -495,10 +511,15 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
         </div>
         <div className="flex items-center gap-2">
           {boardData?.providerType && (
-            <Badge variant={boardData.providerType === 'gmail' ? 'default' : 'secondary'} className="text-xs">
-              {boardData.providerType === 'gmail' ? '📧 Gmail' : 
-               boardData.providerType === 'imap' ? '📬 IMAP' : 
-               '💾 Local'}
+            <Badge
+              variant={boardData.providerType === "gmail" ? "default" : "secondary"}
+              className="text-xs"
+            >
+              {boardData.providerType === "gmail"
+                ? "📧 Gmail"
+                : boardData.providerType === "imap"
+                  ? "📬 IMAP"
+                  : "💾 Local"}
             </Badge>
           )}
           <Button variant="outline" size="sm" onClick={() => setShowColumnManager(true)}>
@@ -519,7 +540,7 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
 
       <DndProvider backend={HTML5Backend}>
         <div className="flex-1 overflow-x-auto pb-4">
-          <div 
+          <div
             className="grid h-full min-h-[400px] gap-3"
             style={{
               gridTemplateColumns: `repeat(${kanbanColumns.length}, minmax(280px, 1fr))`,
@@ -530,18 +551,18 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
               <div className="col-span-full flex items-center justify-center">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
               </div>
-          ) : (
-            kanbanColumns.map((column) => (
-              <KanbanColumnComponent
-                key={column.id}
-                column={column}
-                emails={getEmailsForColumn(column)}
-                onCardClick={setSelectedEmailId}
-                onMove={handleMove}
-              />
-            ))
-          )}
-        </div>
+            ) : (
+              kanbanColumns.map((column) => (
+                <KanbanColumnComponent
+                  key={column.id}
+                  column={column}
+                  emails={getEmailsForColumn(column)}
+                  onCardClick={setSelectedEmailId}
+                  onMove={handleMove}
+                />
+              ))
+            )}
+          </div>
         </div>
       </DndProvider>
 
