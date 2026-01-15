@@ -1,20 +1,21 @@
-import { useState } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Clock } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Clock, Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { emailService } from '@/services/email';
-import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { emailService } from "@/services/email";
 
 interface SnoozeDialogProps {
   emailId: string;
@@ -23,14 +24,9 @@ interface SnoozeDialogProps {
   onSuccess?: () => void;
 }
 
-export function SnoozeDialog({
-  emailId,
-  open,
-  onOpenChange,
-  onSuccess,
-}: SnoozeDialogProps) {
+export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState('09:00');
+  const [selectedTime, setSelectedTime] = useState("09:00");
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
 
@@ -41,38 +37,39 @@ export function SnoozeDialog({
     const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
 
     // Calculate "Later today" or "Tomorrow morning"
-    const laterTodayLabel = currentHour < 15 
-      ? 'Later today (6 PM)' 
-      : 'Tomorrow morning (9 AM)';
+    const laterTodayLabel = currentHour < 15 ? "Later today (6 PM)" : "Tomorrow morning (9 AM)";
 
     // Calculate weekend label
-    let weekendLabel = 'This weekend (Sat 9 AM)';
+    let weekendLabel = "This weekend (Sat 9 AM)";
     if (currentDay === 6 || currentDay === 0 || (currentDay === 5 && currentHour >= 15)) {
-      weekendLabel = 'Next weekend (Sat 9 AM)';
+      weekendLabel = "Next weekend (Sat 9 AM)";
     }
 
     // Calculate next Monday date
     const nextMonday = new Date(now);
-    const daysUntilNextMonday = ((8 - now.getDay()) % 7) || 7;
+    const daysUntilNextMonday = (8 - now.getDay()) % 7 || 7;
     nextMonday.setDate(nextMonday.getDate() + daysUntilNextMonday);
-    const nextMondayFormatted = nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const nextMondayFormatted = nextMonday.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
 
     return [
       {
         label: laterTodayLabel,
-        preset: 'later_today',
+        preset: "later_today",
       },
       {
-        label: 'Tomorrow (9 AM)',
-        preset: 'tomorrow',
+        label: "Tomorrow (9 AM)",
+        preset: "tomorrow",
       },
       {
         label: weekendLabel,
-        preset: 'this_weekend',
+        preset: "this_weekend",
       },
       {
         label: `Next week (Mon ${nextMondayFormatted}, 9 AM)`,
-        preset: 'next_week',
+        preset: "next_week",
       },
     ];
   };
@@ -82,22 +79,22 @@ export function SnoozeDialog({
   const handlePresetSnooze = async (preset: string) => {
     setIsLoading(true);
     try {
-      console.log('[SnoozeDialog] Snoozing with preset:', preset);
       await emailService.snoozeEmailWithPreset(emailId, preset);
-      
+
       // Wait for queries to be invalidated
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['kanban'] }),
-        queryClient.invalidateQueries({ queryKey: ['emails'] }),
+        queryClient.invalidateQueries({ queryKey: ["kanban"] }),
+        queryClient.invalidateQueries({ queryKey: ["emails"] }),
       ]);
-      
-      console.log('[SnoozeDialog] Snooze successful');
-      toast.success('Email snoozed successfully!');
+
+      toast.success("Email snoozed successfully!");
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
-      console.error('[SnoozeDialog] Error snoozing email:', error);
-      toast.error('Failed to snooze email. Please try again.');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage =
+        err?.response?.data?.message || err?.message || "Failed to snooze email. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -105,41 +102,39 @@ export function SnoozeDialog({
 
   const handleCustomSnooze = async () => {
     if (!selectedDate) {
-      toast.error('Please select a date');
+      toast.error("Please select a date");
       return;
     }
 
     setIsLoading(true);
     try {
       // Combine date and time
-      const [hours, minutes] = selectedTime.split(':').map(Number);
+      const [hours, minutes] = selectedTime.split(":").map(Number);
       const snoozeDate = new Date(selectedDate);
       snoozeDate.setHours(hours, minutes, 0, 0);
 
       // Check if date is in the future
       if (snoozeDate <= new Date()) {
-        toast.error('Snooze time must be in the future');
+        toast.error("Snooze time must be in the future");
         return;
       }
 
-      console.log('[SnoozeDialog] Snoozing with custom date:', snoozeDate.toISOString());
       await emailService.snoozeEmail(emailId, snoozeDate.toISOString());
-      
+
       // Wait for queries to be invalidated
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['kanban'] }),
-        queryClient.invalidateQueries({ queryKey: ['emails'] }),
+        queryClient.invalidateQueries({ queryKey: ["kanban"] }),
+        queryClient.invalidateQueries({ queryKey: ["emails"] }),
       ]);
-      
-      console.log('[SnoozeDialog] Snooze successful');
-      toast.success(
-        `Email will return on ${format(snoozeDate, 'dd/MM/yyyy HH:mm')}`
-      );
+
+      toast.success(`Email will return on ${format(snoozeDate, "dd/MM/yyyy HH:mm")}`);
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
-      console.error('[SnoozeDialog] Error snoozing email:', error);
-      toast.error('Failed to snooze email. Please try again.');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage =
+        err?.response?.data?.message || err?.message || "Failed to snooze email. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -150,12 +145,10 @@ export function SnoozeDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
+            <Clock className="size-5" />
             Snooze Email
           </DialogTitle>
-          <DialogDescription>
-            Choose when this email should return to your inbox
-          </DialogDescription>
+          <DialogDescription>Choose when this email should return to your inbox</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -192,7 +185,7 @@ export function SnoozeDialog({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="custom-date" className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4" />
+                <CalendarIcon className="size-4" />
                 Select date
               </Label>
               <Calendar
@@ -206,7 +199,7 @@ export function SnoozeDialog({
 
             <div className="space-y-2">
               <Label htmlFor="custom-time" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
+                <Clock className="size-4" />
                 Select time
               </Label>
               <Input
@@ -223,7 +216,7 @@ export function SnoozeDialog({
               disabled={isLoading || !selectedDate}
               className="w-full"
             >
-              {isLoading ? 'Processing...' : 'Snooze until this time'}
+              {isLoading ? "Processing..." : "Snooze until this time"}
             </Button>
           </div>
         </div>
