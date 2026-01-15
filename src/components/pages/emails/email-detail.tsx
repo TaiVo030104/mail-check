@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { ComposeDialog, ComposeMode } from './compose-dialog';
 import { SnoozeDialog } from './snooze-dialog';
 import { AiSummaryDialog } from './ai-summary-dialog';
+import { AttachmentPreview } from '@/components/AttachmentPreview';
 import { useState } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 
@@ -319,22 +320,36 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleDownloadAttachment(
-                attachment.id || attachment.attachmentId,
-                attachment.filename || attachment.originalName
-              )}
-              disabled={downloadAttachmentMutation.isPending}
-              title="Download"
-            >
-              {downloadAttachmentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex items-center gap-1">
+              <AttachmentPreview
+                attachmentId={attachment.id || attachment.attachmentId}
+                filename={attachment.filename || attachment.originalName}
+                mimeType={attachment.mimeType}
+                size={attachment.size}
+                emailId={email.id}
+                onDownload={() => handleDownloadAttachment(
+                  attachment.id || attachment.attachmentId,
+                  attachment.filename || attachment.originalName
+                )}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleDownloadAttachment(
+                  attachment.id || attachment.attachmentId,
+                  attachment.filename || attachment.originalName
+                )}
+                disabled={downloadAttachmentMutation.isPending}
+                title="Download"
+              >
+                {downloadAttachmentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         ))}
       </div>

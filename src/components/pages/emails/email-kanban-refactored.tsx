@@ -119,6 +119,11 @@ function EmailCard({ email, columnId, onCardClick }: EmailCardProps) {
           </p>
         </div>
       )}
+      {email.snoozeUntil && columnId === "snoozed" && (
+        <div className="mt-2">
+          <SnoozeCountdown snoozeUntil={email.snoozeUntil} />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground md:text-[11px]">
         <span>{format(new Date(email.sentAt), "dd/MM HH:mm")}</span>
       </div>
@@ -204,6 +209,17 @@ export function EmailKanbanRefactored({ filters, searchEmails, onBackToEmail }: 
     queryClient.invalidateQueries({ queryKey: ['kanban', 'board'] });
     refetchBoard();
   }, []);
+
+  // Auto-refresh polling every 60 seconds for snoozed emails
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Silently refetch snoozed emails to check for wake-ups
+      refetchSnoozed();
+      refetchInbox();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(intervalId);
+  }, [refetchSnoozed, refetchInbox]);
 
   const {
     data: inboxData,
