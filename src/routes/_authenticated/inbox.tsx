@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 // import { ThemeToggle } from '@/components/theme-toggle';
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AboutDialog } from "@/components/AboutDialog";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ComposeDialog } from "@/components/pages/emails/compose-dialog";
 import { EmailBulkActions } from "@/components/pages/emails/email-bulk-actions";
 import { EmailDetail } from "@/components/pages/emails/email-detail";
@@ -329,6 +330,9 @@ function InboxPage() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      {/* Offline/Online Indicator */}
+      <OfflineIndicator />
+      
       {/* Top Navigation Bar */}
       <header
         className="flex h-14 items-center justify-between border-b bg-background px-3 md:h-16 md:px-4"

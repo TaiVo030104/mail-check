@@ -13,7 +13,7 @@ import { EmailDetail } from "./email-detail";
 import { SnoozeDialog } from "./snooze-dialog";
 import { KanbanColumnManager } from "./kanban-column-manager";
 import { format } from "date-fns";
-import { Loader2, RefreshCcw, Settings } from "lucide-react";
+import { Loader2, RefreshCcw, Settings, Sparkles } from "lucide-react";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -100,8 +100,26 @@ function EmailCard({ email, columnId, onCardClick }: EmailCardProps) {
       <div className="mb-1 flex items-center justify-between gap-1 md:gap-2">
         <span className="line-clamp-1 text-xs font-semibold md:text-sm">{email.subject}</span>
       </div>
-      <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground md:mt-2 md:text-[11px]">
+      <div className="text-[10px] text-muted-foreground md:text-[11px]">
         <span className="line-clamp-1">From: {email.from}</span>
+      </div>
+      {email.preview && (
+        <div className="mt-1 text-[10px] text-muted-foreground/80 md:text-xs line-clamp-2">
+          {email.preview}
+        </div>
+      )}
+      {email.aiSummary && (
+        <div className="mt-2 rounded-md bg-purple-50 dark:bg-purple-950/20 p-2 border border-purple-200 dark:border-purple-800">
+          <div className="flex items-start gap-1 mb-1">
+            <Sparkles className="h-3 w-3 text-purple-500 flex-shrink-0 mt-0.5" />
+            <span className="text-[9px] md:text-[10px] font-medium text-purple-700 dark:text-purple-400">AI Summary</span>
+          </div>
+          <p className="text-[9px] md:text-[10px] text-purple-900/80 dark:text-purple-100/80 line-clamp-2">
+            {email.aiSummary}
+          </p>
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground md:text-[11px]">
         <span>{format(new Date(email.sentAt), "dd/MM HH:mm")}</span>
       </div>
     </Card>

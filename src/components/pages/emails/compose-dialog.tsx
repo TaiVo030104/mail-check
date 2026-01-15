@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useSendEmail, useUploadAttachment } from '@/hooks/react-query/useEmails';
 import { useCreateDraft, useUpdateDraft } from '@/hooks/react-query/useDrafts';
-import { Loader2, Paperclip, X, FileIcon } from 'lucide-react';
+import { Loader2, Paperclip, X, FileIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { AttachmentDto, EmailDetail } from '@/services/email';
 import { useToast } from '@/hooks/use-toast';
@@ -71,6 +71,8 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
   const [isUploading, setIsUploading] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(draftId || null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [showQuotedText, setShowQuotedText] = useState(false);
+  const [quotedText, setQuotedText] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -228,12 +230,12 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
       const email = initialData.email;
 
       if (mode === "forward") {
+        const quoted = `\n\n---------- Forwarded message ---------\nFrom: ${email.from}\nDate: ${email.sentAt}\nSubject: ${email.subject}\nTo: ${email.to}\n\n${email.body}`;
+        setQuotedText(quoted);
         form.reset({
           to: initialData.to || "",
           subject: email.subject.startsWith("Fw:") ? email.subject : `Fw: ${email.subject}`,
-          body:
-            initialData.body ||
-            `\n\n--- Forwarded Message ---\nFrom: ${email.from}\nTo: ${email.to}\nDate: ${email.sentAt}\nSubject: ${email.subject}\n\n${email.body}`,
+          body: initialData.body || "",
         });
       } else if (mode === "reply" || mode === "replyAll") {
         let toValue = extractEmailAddress(email.from);
@@ -252,12 +254,15 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
           toValue = Array.from(recipientsSet).join(", ");
         }
 
+        const quoted = `\n\nOn ${email.sentAt}, ${email.from} wrote:\n\n${email.body}`;
+        setQuotedText(quoted);
         form.reset({
           to: toValue,
           subject: email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
-          body: initialData.body || `\n\n--- Original Message ---\nFrom: ${email.from}\nDate: ${email.sentAt}\nSubject: ${email.subject}\n\n${email.body}`,
+          body: initialData.body || "",
         });
       } else {
+        setQuotedText('');
         form.reset({
           to: initialData.to || "",
           subject: initialData.subject || "",
@@ -265,12 +270,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
         });
       }
     } else if (open && initialData) {
+      setQuotedText('');
       form.reset({
         to: initialData.to || "",
         subject: initialData.subject || "",
         body: initialData.body || "",
       });
     } else if (open) {
+      setQuotedText('');
       form.reset({
         to: "",
         subject: "",
@@ -280,6 +287,9 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
   }, [open, mode, initialData, form]);
 
   const onSubmit = async (data: FormInputs) => {
+    // Combine body with quoted text if present
+    const fullBody = quotedText ? `${data.body}${quotedText}` : data.body;
+    
     if (mode === "reply" || mode === "replyAll") {
       if (initialData?.email) {
         // For reply, we need to send as a new email with reply info
@@ -287,13 +297,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
           {
             to: data.to,
             subject: data.subject,
-            body: data.body,
+            body: fullBody,
             attachments: attachments.length > 0 ? attachments : undefined,
           },
           {
             onSuccess: () => {
               form.reset();
               setAttachments([]);
+              setQuotedText('');
               onOpenChange(false);
             },
           }
@@ -303,12 +314,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
       sendEmailMutation.mutate(
         {
           ...data,
+          body: fullBody,
           attachments: attachments.length > 0 ? attachments : undefined,
         },
         {
           onSuccess: () => {
             form.reset();
             setAttachments([]);
+            setQuotedText('');
             // Delete draft after successful send
             if (currentDraftId) {
               fetch(`/api/email/drafts/${currentDraftId}`, { method: 'DELETE' })
@@ -394,6 +407,30 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
                 </FormItem>
               )}
             />
+
+            {/* Quoted Text Section (Gmail-style) */}
+            {quotedText && (mode === "reply" || mode === "replyAll" || mode === "forward") && (
+              <div className="border rounded-md overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowQuotedText(!showQuotedText)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hover:bg-muted transition-colors text-sm text-muted-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    {showQuotedText ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {mode === "forward" ? "Forwarded message" : "Original message"}
+                  </span>
+                  <span className="text-xs">Click to {showQuotedText ? 'hide' : 'show'}</span>
+                </button>
+                {showQuotedText && (
+                  <div className="p-3 bg-muted/30 border-t">
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans">
+                      {quotedText}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Attachments Section */}
             {attachments.length > 0 && (
