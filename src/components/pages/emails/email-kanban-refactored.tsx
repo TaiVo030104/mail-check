@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Loader2, RefreshCcw, Settings, Sparkles } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useEmailsByFolder } from "@/hooks/react-query/useEmails";
+import { useInfiniteEmailsByFolder } from "@/hooks/react-query/useEmails";
 import {
   useCreateColumn,
   useDeleteColumn,
@@ -147,6 +147,9 @@ interface KanbanColumnComponentProps {
   emails: Email[];
   onCardClick: (emailId: string) => void;
   onMove: (emailId: string, fromColumn: string, toColumn: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 function KanbanColumnComponent({
@@ -154,7 +157,12 @@ function KanbanColumnComponent({
   emails,
   onCardClick,
   onMove,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: KanbanColumnComponentProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
   const [{ isOver }, drop] = useDrop(() => ({
     accept: DND_TYPE,
     drop: (item: DragItem) => {
@@ -165,11 +173,36 @@ function KanbanColumnComponent({
     }),
   }));
 
+  // Combine refs for both drop and scroll
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    // Cast to unknown first, then to mutable ref to bypass readonly restriction
+    (scrollRef as unknown as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    drop(node);
+  }, [drop]);
+
+  // Handle scroll to load more
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement || !onLoadMore || !hasMore || isLoadingMore) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+      
+      // Load more when scrolled to 80% of content
+      if (scrollPercentage > 0.8) {
+        onLoadMore();
+      }
+    };
+
+    scrollElement.addEventListener('scroll', handleScroll);
+    return () => scrollElement.removeEventListener('scroll', handleScroll);
+  }, [onLoadMore, hasMore, isLoadingMore]);
+
   const bgClass = isOver ? "bg-primary/10 border-primary" : "bg-muted/40";
 
   return (
     <div
-      ref={drop}
       className={cn(
         "flex max-h-[calc(100vh-200px)] min-h-[400px] flex-col rounded-lg border p-2 transition-colors md:p-3",
         "min-w-[280px] flex-shrink-0 md:min-w-0",
@@ -188,20 +221,28 @@ function KanbanColumnComponent({
         </Badge>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <div ref={setRefs} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {emails.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-background/40 p-4 text-xs text-muted-foreground">
             Drag emails here
           </div>
         ) : (
-          emails.map((email) => (
-            <EmailCard
-              key={email.id}
-              email={email}
-              columnId={column.id}
-              onCardClick={onCardClick}
-            />
-          ))
+          <>
+            {emails.map((email) => (
+              <EmailCard
+                key={email.id}
+                email={email}
+                columnId={column.id}
+                onCardClick={onCardClick}
+              />
+            ))}
+            {isLoadingMore && (
+              <div className="flex items-center justify-center py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-xs text-muted-foreground">Loading more...</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -232,18 +273,27 @@ export function EmailKanbanRefactored({
   const {
     data: inboxData,
     isLoading: isInboxLoading,
+    fetchNextPage: fetchNextInbox,
+    hasNextPage: hasNextInbox,
+    isFetchingNextPage: isFetchingNextInbox,
     refetch: refetchInbox,
-  } = useEmailsByFolder("inbox", 1, 50, filters);
+  } = useInfiniteEmailsByFolder("inbox", 50, filters);
   const {
     data: archiveData,
     isLoading: isArchiveLoading,
+    fetchNextPage: fetchNextArchive,
+    hasNextPage: hasNextArchive,
+    isFetchingNextPage: isFetchingNextArchive,
     refetch: refetchArchive,
-  } = useEmailsByFolder("archive", 1, 50, filters);
+  } = useInfiniteEmailsByFolder("archive", 50, filters);
   const {
     data: snoozedData,
     isLoading: isSnoozedLoading,
+    fetchNextPage: fetchNextSnoozed,
+    hasNextPage: hasNextSnoozed,
+    isFetchingNextPage: isFetchingNextSnoozed,
     refetch: refetchSnoozed,
-  } = useEmailsByFolder("snoozed", 1, 50, filters);
+  } = useInfiniteEmailsByFolder("snoozed", 50, filters);
 
   // Force refresh board on mount to get latest data
   useEffect(() => {
@@ -287,11 +337,22 @@ export function EmailKanbanRefactored({
     setKanbanColumns(mapped);
   }, [boardData]);
 
-  let allEmails: Email[] = searchEmails || [
-    ...(inboxData?.emails || []),
-    ...(archiveData?.emails || []),
-    ...(snoozedData?.emails || []),
-  ];
+  // Flatten infinite query pages into single arrays
+  const inboxEmails = inboxData?.pages?.flatMap(page => page.emails) || [];
+  const archiveEmails = archiveData?.pages?.flatMap(page => page.emails) || [];
+  const snoozedEmails = snoozedData?.pages?.flatMap(page => page.emails) || [];
+
+  // Deduplicate emails by ID - keep the most recent version
+  const emailMap = new Map<string, Email>();
+  [...inboxEmails, ...archiveEmails, ...snoozedEmails].forEach((email) => {
+    const existing = emailMap.get(email.id);
+    // Always update if: 1) doesn't exist, OR 2) current has snooze status and existing doesn't
+    if (!existing || ((email.isSnoozed || email.snoozeUntil) && !existing.isSnoozed)) {
+      emailMap.set(email.id, email);
+    }
+  });
+
+  let allEmails: Email[] = searchEmails || Array.from(emailMap.values());
 
   // Apply filters to search results if searching
   if (searchEmails && filters) {
@@ -361,8 +422,12 @@ export function EmailKanbanRefactored({
           !email.labels?.includes("snoozed")
       );
     } else if (column.id === "snoozed") {
+      // Snoozed column: check BOTH labels AND snooze status
       emails = allEmails.filter(
-        (email) => email.labels?.includes("snoozed") || !!email.snoozeUntil
+        (email) => 
+          email.labels?.includes("snoozed") || 
+          email.isSnoozed === true || 
+          !!email.snoozeUntil
       );
     } else {
       // Other columns: filter by label
@@ -449,11 +514,20 @@ export function EmailKanbanRefactored({
     refetchBoard();
   };
 
-  const handleSnoozeSuccess = () => {
+  const handleSnoozeSuccess = async () => {
     setPendingSnooze(null);
+    // Invalidate queries to force refetch with latest data
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["emails-infinite", "inbox"] }),
+      queryClient.invalidateQueries({ queryKey: ["emails-infinite", "snoozed"] }),
+      queryClient.invalidateQueries({ queryKey: ["emails-infinite", "archive"] }),
+      queryClient.invalidateQueries({ queryKey: ["kanban", "board"] }),
+    ]);
+    // Refetch to get updated data
     refetchInbox();
     refetchArchive();
     refetchSnoozed();
+    refetchBoard();
   };
 
   const handleAddColumn = (column: Omit<KanbanColumn, "id">) => {
@@ -510,18 +584,6 @@ export function EmailKanbanRefactored({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {boardData?.providerType && (
-            <Badge
-              variant={boardData.providerType === "gmail" ? "default" : "secondary"}
-              className="text-xs"
-            >
-              {boardData.providerType === "gmail"
-                ? "📧 Gmail"
-                : boardData.providerType === "imap"
-                  ? "📬 IMAP"
-                  : "💾 Local"}
-            </Badge>
-          )}
           <Button variant="outline" size="sm" onClick={() => setShowColumnManager(true)}>
             <Settings className="mr-2 size-4" />
             Manage Columns
@@ -552,15 +614,39 @@ export function EmailKanbanRefactored({
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              kanbanColumns.map((column) => (
-                <KanbanColumnComponent
-                  key={column.id}
-                  column={column}
-                  emails={getEmailsForColumn(column)}
-                  onCardClick={setSelectedEmailId}
-                  onMove={handleMove}
-                />
-              ))
+              kanbanColumns.map((column) => {
+                // Determine which folder and load more function to use
+                let onLoadMore: (() => void) | undefined;
+                let hasMore = false;
+                let isLoadingMore = false;
+
+                if (column.id === 'inbox') {
+                  onLoadMore = () => hasNextInbox && fetchNextInbox();
+                  hasMore = hasNextInbox || false;
+                  isLoadingMore = isFetchingNextInbox;
+                } else if (column.id === 'snoozed') {
+                  onLoadMore = () => hasNextSnoozed && fetchNextSnoozed();
+                  hasMore = hasNextSnoozed || false;
+                  isLoadingMore = isFetchingNextSnoozed;
+                } else if (column.label === 'done' || column.label === 'archive') {
+                  onLoadMore = () => hasNextArchive && fetchNextArchive();
+                  hasMore = hasNextArchive || false;
+                  isLoadingMore = isFetchingNextArchive;
+                }
+
+                return (
+                  <KanbanColumnComponent
+                    key={column.id}
+                    column={column}
+                    emails={getEmailsForColumn(column)}
+                    onCardClick={setSelectedEmailId}
+                    onMove={handleMove}
+                    onLoadMore={onLoadMore}
+                    hasMore={hasMore}
+                    isLoadingMore={isLoadingMore}
+                  />
+                );
+              })
             )}
           </div>
         </div>
@@ -572,7 +658,7 @@ export function EmailKanbanRefactored({
           if (!open) setSelectedEmailId(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden p-0 [&>button]:hidden">
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 [&>button]:hidden">
           {selectedEmailId && (
             <EmailDetail
               emailId={selectedEmailId}

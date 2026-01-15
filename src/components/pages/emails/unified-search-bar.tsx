@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Calendar, Hash, Loader2, Mail, Paperclip, Search, User, X } from "lucide-react";
+import { Calendar, Hash, Lightbulb, Loader2, Mail, Paperclip, Search, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -289,8 +289,8 @@ export function UnifiedSearchBar({
               <div className="border-b">
                 <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 dark:from-blue-950/50 dark:to-purple-950/50">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                      💡 Type-ahead Suggestions
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                      <Lightbulb className="h-3 w-3" /> Type-ahead Suggestions
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       (Use ↑↓ arrows, press Enter to select)
@@ -352,8 +352,8 @@ export function UnifiedSearchBar({
             {/* Search Results Section */}
             {query.length >= 2 && (
               <div>
-                <div className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground">
-                  📧 Top Results (sorted by relevance)
+                <div className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <Mail className="h-3 w-3" /> Top Results (sorted by relevance)
                 </div>
                 {isLoading && topResults.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">

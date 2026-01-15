@@ -254,7 +254,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
             </h2>
 
             {/* Snooze Status Banner */}
-            {email.isSnoozed && email.snoozeUntil && (
+            {(email.isSnoozed || email.labels?.includes('snoozed')) && email.snoozeUntil && (
               <div className="mb-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-orange-950/20 md:mb-4">
                 <Clock3 className="size-4 shrink-0 text-orange-600 dark:text-orange-400" />
                 <div className="min-w-0 flex-1">
@@ -342,7 +342,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
             <Forward className="size-3.5 md:size-4" />
             <span className="hidden sm:inline">Forward</span>
           </Button>
-          {!email.isSnoozed ? (
+          {!(email.isSnoozed || email.labels?.includes('snoozed')) ? (
             <Button
               variant="outline"
               size="sm"

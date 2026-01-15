@@ -6,7 +6,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Keyboard } from 'lucide-react';
+import { Keyboard, Lightbulb } from 'lucide-react';
 import { emailShortcuts, formatShortcut } from '@/hooks/useKeyboardShortcuts';
 
 interface AdvancedShortcutsHelpProps {
@@ -63,7 +63,9 @@ export function AdvancedShortcutsHelp({ open, onOpenChange }: AdvancedShortcutsH
 
             {/* Tips Section */}
             <div className="mt-6 p-4 bg-muted/30 rounded-lg border border-border">
-              <h3 className="text-sm font-semibold mb-2">💡 Pro Tips</h3>
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <Lightbulb className="h-4 w-4" /> Pro Tips
+              </h3>
               <ul className="space-y-1 text-xs text-muted-foreground">
                 <li>• Use <kbd className="px-1 py-0.5 bg-muted rounded">j/k</kbd> for quick navigation through emails</li>
                 <li>• Press <kbd className="px-1 py-0.5 bg-muted rounded">x</kbd> to select, then use bulk actions</li>
