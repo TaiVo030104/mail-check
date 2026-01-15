@@ -16,6 +16,11 @@ services:
     image: ghcr.io/awad-final-project/frontend:{{ final_frontend_branch | default('dev') }}
     container_name: {{ app_name }}-frontend
     restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=https://{{ final_domain_name | default(domain_name) }}/api
+      - VITE_USE_COOKIE_AUTH=false
+      - VITE_ENABLE_GOOGLE_AUTH=true
+      - VITE_ENABLE_GPT5_1_CODEX_MAX=true
     depends_on:
       - backend-dev
     networks:
