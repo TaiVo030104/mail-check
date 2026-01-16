@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, GitBranch, Server, Activity, Copy, Check } from 'lucide-react';
+import { Info, GitBranch, Server, Activity, Copy, Check, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -290,7 +290,9 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               </div>
             ) : backendError ? (
               <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                <p className="text-sm font-semibold text-destructive">⚠️ Backend Connection Failed</p>
+                <p className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4" /> Backend Connection Failed
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Unable to connect to backend server. Please check if the backend is running.
                 </p>

@@ -1,4 +1,5 @@
 import { formatDistanceToNow, isPast } from 'date-fns';
+import { Clock } from 'lucide-react';
 
 interface SnoozeCountdownProps {
   snoozeUntil?: Date | string;
@@ -13,8 +14,8 @@ export function SnoozeCountdown({ snoozeUntil, className = '' }: SnoozeCountdown
   // Check if already expired
   if (isPast(snoozeDate)) {
     return (
-      <span className={`text-xs text-orange-600 dark:text-orange-400 ${className}`}>
-        ⏰ Waking up...
+      <span className={`text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 ${className}`}>
+        <Clock className="h-3 w-3" /> Waking up...
       </span>
     );
   }
@@ -23,8 +24,8 @@ export function SnoozeCountdown({ snoozeUntil, className = '' }: SnoozeCountdown
   const relativeTime = formatDistanceToNow(snoozeDate, { addSuffix: false });
   
   return (
-    <span className={`text-xs text-muted-foreground ${className}`}>
-      ⏰ Wake up in {relativeTime}
+    <span className={`text-xs text-muted-foreground flex items-center gap-1 ${className}`}>
+      <Clock className="h-3 w-3" /> Wake up in {relativeTime}
     </span>
   );
 }

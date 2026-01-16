@@ -1,5 +1,5 @@
 import { useOfflineCache } from '@/hooks/useOfflineCache';
-import { WifiOff, Wifi, HardDrive } from 'lucide-react';
+import { WifiOff, Wifi, HardDrive, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -88,8 +88,8 @@ export function OfflineIndicator() {
 
           {!isOnline && (
             <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md border border-yellow-200 dark:border-yellow-800">
-              <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                ⚠️ You're working offline. Some features may be limited.
+              <p className="text-xs text-yellow-800 dark:text-yellow-200 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" /> You're working offline. Some features may be limited.
               </p>
             </div>
           )}
