@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, X, Mail, Loader2, Calendar, Paperclip, User, Hash } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useDebounce } from "use-debounce";
-import { searchService, SearchResult } from "@/services/search";
-import { Email } from "@/services/email";
 import { format, subDays } from "date-fns";
+import { Calendar, Hash, Loader2, Mail, Paperclip, Search, User, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useDebounce } from "use-debounce";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { searchService } from "@/services/search";
+import type { Email } from "@/types/email";
+import type { SearchResult } from "@/types/search";
 
 interface SmartSearchBarProps {
   onSearch: (query: string) => void;
@@ -45,14 +47,12 @@ export function SmartSearchBar({
   const resultsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-focus when component mounts
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
 
-  // Show dropdown when query is long enough
   useEffect(() => {
     if (query.length >= 2) {
       setIsOpen(true);
@@ -64,10 +64,8 @@ export function SmartSearchBar({
     }
   }, [query]);
 
-  // Fetch suggestions when query changes (for autocomplete)
   useEffect(() => {
     if (query.length >= 2 && query.length < 3) {
-      // Show suggestions when query is 2 characters
       setIsLoadingSuggestions(true);
       Promise.all([
         searchService.getContactSuggestions(query, 5),
@@ -81,8 +79,7 @@ export function SmartSearchBar({
           setSuggestions(allSuggestions.slice(0, 8));
           setShowSuggestions(true);
         })
-        .catch((error) => {
-          console.error("Error fetching suggestions:", error);
+        .catch(() => {
           setSuggestions([]);
         })
         .finally(() => {
@@ -94,7 +91,6 @@ export function SmartSearchBar({
     }
   }, [query]);
 
-  // Fetch search results when debounced query changes
   useEffect(() => {
     if (debouncedQuery.length >= 2) {
       setIsLoading(true);
@@ -103,7 +99,6 @@ export function SmartSearchBar({
         .then((response) => {
           let results = response.results || [];
 
-          // Apply filters
           if (filters.hasAttachments) {
             results = results.filter((r) => r.email.hasAttachments);
           }
@@ -116,10 +111,9 @@ export function SmartSearchBar({
           }
 
           setSearchResults(results);
-          setShowSuggestions(false); // Hide suggestions when we have results
+          setShowSuggestions(false);
         })
-        .catch((error) => {
-          console.error("Error fetching search results:", error);
+        .catch(() => {
           setSearchResults([]);
         })
         .finally(() => {
@@ -139,9 +133,10 @@ export function SmartSearchBar({
     setQuery(suggestion.text);
     setShowSuggestions(false);
     setSuggestions([]);
-    // Trigger search with the selected suggestion
+
+    // trigger search if debounced query differs
     if (debouncedQuery !== suggestion.text) {
-      // The debounced query will trigger search automatically
+      setQuery(suggestion.text);
     }
   };
 
@@ -195,7 +190,6 @@ export function SmartSearchBar({
     }
   };
 
-  // Scroll selected result into view
   useEffect(() => {
     if (selectedIndex >= 0 && resultsRef.current) {
       const selectedElement = resultsRef.current.children[selectedIndex] as HTMLElement;
@@ -205,7 +199,6 @@ export function SmartSearchBar({
     }
   }, [selectedIndex]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node) && isOpen) {
@@ -224,7 +217,7 @@ export function SmartSearchBar({
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
           type="search"
@@ -243,22 +236,22 @@ export function SmartSearchBar({
           aria-autocomplete="list"
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {isLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
           {query && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleClear}
-              className="h-6 w-6 p-0"
+              className="size-6 p-0"
               aria-label="Clear search"
             >
-              <X className="h-3 w-3" />
+              <X className="size-3" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Suggestions Dropdown (when query is short) */}
+      {}
       {isOpen && showSuggestions && suggestions.length > 0 && query.length >= 2 && (
         <div
           ref={resultsRef}
@@ -267,7 +260,7 @@ export function SmartSearchBar({
         >
           {isLoadingSuggestions ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mx-auto mb-2 size-4 animate-spin" />
               Đang tải gợi ý...
             </div>
           ) : (
@@ -285,9 +278,9 @@ export function SmartSearchBar({
                 aria-selected={selectedIndex === index}
               >
                 {suggestion.type === "contact" ? (
-                  <User className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <User className="size-4 shrink-0 text-muted-foreground" />
                 ) : (
-                  <Hash className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <Hash className="size-4 shrink-0 text-muted-foreground" />
                 )}
                 <span className="flex-1 truncate">{suggestion.text}</span>
                 <span className="text-xs capitalize text-muted-foreground">
@@ -299,14 +292,14 @@ export function SmartSearchBar({
         </div>
       )}
 
-      {/* Search Results Dropdown */}
+      {}
       {isOpen && !showSuggestions && query.length >= 2 && (
         <div
           ref={resultsRef}
           className="absolute z-[100] mt-1 max-h-[600px] w-full overflow-hidden rounded-md border bg-popover shadow-lg"
           role="listbox"
         >
-          {/* Filter Buttons */}
+          {}
           <div className="flex flex-wrap gap-2 border-b p-3">
             <Button
               variant={filters.hasAttachments ? "default" : "outline"}
@@ -334,16 +327,16 @@ export function SmartSearchBar({
             </Button>
           </div>
 
-          {/* Results List */}
+          {}
           <div className="max-h-[400px] overflow-auto">
             {isLoading && searchResults.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mx-auto mb-2 size-4 animate-spin" />
                 Đang tìm kiếm...
               </div>
             ) : searchResults.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                <Mail className="mx-auto mb-2 h-6 w-6 opacity-50" />
+                <Mail className="mx-auto mb-2 size-6 opacity-50" />
                 <p>Không tìm thấy kết quả nào</p>
                 <p className="mt-1 text-xs">Thử tìm kiếm với từ khóa khác</p>
               </div>
@@ -363,12 +356,12 @@ export function SmartSearchBar({
                   aria-selected={selectedIndex === index}
                 >
                   <div className="flex items-start gap-3">
-                    <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="truncate text-sm font-medium">{result.email.from}</span>
                         {!result.email.isRead && (
-                          <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                          <span className="size-2 shrink-0 rounded-full bg-primary" />
                         )}
                       </div>
                       <h4 className="mb-1 line-clamp-1 text-sm font-semibold">
@@ -379,12 +372,12 @@ export function SmartSearchBar({
                       </p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                          <Calendar className="size-3" />
                           <span>{format(new Date(result.email.sentAt), "dd/MM/yyyy")}</span>
                         </div>
                         {result.email.hasAttachments && (
                           <div className="flex items-center gap-1">
-                            <Paperclip className="h-3 w-3" />
+                            <Paperclip className="size-3" />
                             <span>Đính kèm</span>
                           </div>
                         )}
@@ -396,10 +389,10 @@ export function SmartSearchBar({
             )}
           </div>
 
-          {/* Footer */}
+          {}
           <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Search className="h-3 w-3" />
+              <Search className="size-3" />
               <span>Mọi kết quả tìm kiếm cho "{debouncedQuery}"</span>
             </div>
             <span className="text-xs">Nhấn ENTER</span>

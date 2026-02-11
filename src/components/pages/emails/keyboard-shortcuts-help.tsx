@@ -1,11 +1,12 @@
+import { Keyboard } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Keyboard } from 'lucide-react';
+} from "@/components/ui/dialog";
 
 interface KeyboardShortcutsHelpProps {
   open: boolean;
@@ -14,28 +15,28 @@ interface KeyboardShortcutsHelpProps {
 
 const shortcuts = [
   {
-    category: 'Navigation',
+    category: "Navigation",
     items: [
-      { keys: ['↑', '↓'], description: 'Navigate between emails' },
-      { keys: ['Enter'], description: 'Open selected email' },
-      { keys: ['Esc'], description: 'Close email detail' },
+      { keys: ["↑", "↓"], description: "Navigate between emails" },
+      { keys: ["Enter"], description: "Open selected email" },
+      { keys: ["Esc"], description: "Close email detail" },
     ],
   },
   {
-    category: 'Actions',
+    category: "Actions",
     items: [
-      { keys: ['C'], description: 'Compose new email' },
-      { keys: ['R'], description: 'Refresh mailbox' },
-      { keys: ['S'], description: 'Star/unstar email' },
-      { keys: ['D'], description: 'Delete email' },
+      { keys: ["C"], description: "Compose new email" },
+      { keys: ["R"], description: "Refresh mailbox" },
+      { keys: ["S"], description: "Star/unstar email" },
+      { keys: ["D"], description: "Delete email" },
     ],
   },
   {
-    category: 'Email Detail',
+    category: "Email Detail",
     items: [
-      { keys: ['Reply'], description: 'Reply to email (use button)' },
-      { keys: ['Reply All'], description: 'Reply to all (use button)' },
-      { keys: ['Forward'], description: 'Forward email (use button)' },
+      { keys: ["Reply"], description: "Reply to email (use button)" },
+      { keys: ["Reply All"], description: "Reply to all (use button)" },
+      { keys: ["Forward"], description: "Forward email (use button)" },
     ],
   },
 ];
@@ -46,7 +47,7 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <Keyboard className="h-5 w-5" />
+            <Keyboard className="size-5" />
             <DialogTitle>Keyboard Shortcuts</DialogTitle>
           </div>
           <DialogDescription>
@@ -54,10 +55,10 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="mt-4 space-y-6">
           {shortcuts.map((section) => (
             <div key={section.category}>
-              <h3 className="font-semibold text-sm mb-3 text-muted-foreground uppercase tracking-wide">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {section.category}
               </h3>
               <div className="space-y-2">
@@ -68,7 +69,7 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
                       {item.keys.map((key, keyIndex) => (
                         <kbd
                           key={keyIndex}
-                          className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-md dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
+                          className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                         >
                           {key}
                         </kbd>
@@ -81,9 +82,12 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
           ))}
         </div>
 
-        <div className="mt-6 p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-          <p className="font-medium mb-1">Note:</p>
-          <p>Keyboard shortcuts won't work when you're typing in an input field or composing an email.</p>
+        <div className="mt-6 rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+          <p className="mb-1 font-medium">Note:</p>
+          <p>
+            Keyboard shortcuts won't work when you're typing in an input field or composing an
+            email.
+          </p>
         </div>
       </DialogContent>
     </Dialog>

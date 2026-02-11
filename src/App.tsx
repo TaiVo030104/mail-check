@@ -1,61 +1,61 @@
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { HTTPError } from "ky";
+import { AxiosError } from "axios";
 import { ErrorBoundary } from "react-error-boundary";
 
-import ErrorFallback from "@/components/ErrorFallback";
-import PageNotFound from "@/components/PageNotFound";
+import { ErrorFallback } from "@/components/error-fallback";
+import { PageNotFound } from "@/components/page-not-found";
 import { Toaster } from "@/components/ui/toaster";
+import { toast } from "@/hooks/use-toast";
 import { routeTree } from "@/routeTree.gen";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       throwOnError: (error) => {
-        if (error instanceof HTTPError) {
-          return error.response?.status >= 500;
+        if (error instanceof AxiosError) {
+          return (error.response?.status ?? 0) >= 500;
         }
         return false;
       },
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       retry: (failureCount, error) => {
-        // Don't retry on 4xx errors (client errors)
-        if (error instanceof HTTPError) {
-          const status = error.response?.status || 0;
+        if (error instanceof AxiosError) {
+          const status = error.response?.status ?? 0;
           if (status >= 400 && status < 500) {
             return false;
           }
         }
-        // Retry up to 3 times for network errors and 5xx errors
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => {
-        // Exponential backoff: 1s, 2s, 4s
         return Math.min(1000 * 2 ** attemptIndex, 30000);
       },
     },
     mutations: {
       retry: (failureCount, error) => {
-        // Don't retry mutations on client errors
-        if (error instanceof HTTPError) {
-          const status = error.response?.status || 0;
+        if (error instanceof AxiosError) {
+          const status = error.response?.status ?? 0;
           if (status >= 400 && status < 500) {
             return false;
           }
         }
-        // Retry once for network errors
         return failureCount < 1;
       },
     },
   },
   queryCache: new QueryCache({
     onError: (error, query) => {
-      // 🎉 only show error toasts if we already have data in the cache
-      // which indicates a failed background update
       if (query.state.data !== undefined) {
-        // toast error message
-        console.error(error);
+        toast({
+          title: "Background update failed",
+          description:
+            error instanceof AxiosError
+              ? (error.response?.data as { message?: string })?.message || error.message
+              : "An unexpected error occurred",
+          variant: "destructive",
+        });
       }
     },
   }),
@@ -68,7 +68,7 @@ const router = createRouter({
   defaultErrorComponent: () => <ErrorFallback />,
 });
 
-function App() {
+export function App() {
   return (
     <ErrorBoundary fallback={<ErrorFallback />}>
       <QueryClientProvider client={queryClient}>

@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, CheckCircle2, ShieldCheck, Shield, Mail } from "lucide-react";
+import { CalendarDays, CheckCircle2, Mail, Shield, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 
-import { useSignOut, useUserProfile } from "@/hooks/react-query/useAuth";
-import { useSeedMockEmails } from "@/hooks/react-query/useEmails";
-import { useAuthStore } from "@/hooks/useAuthStore";
+import { RequireRole } from "@/components/require-role";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { UserRole } from "@/constants";
+import { useSignOut, useUserProfile } from "@/hooks/react-query/use-auth";
+import { useSeedMockEmails } from "@/hooks/react-query/use-emails";
+import { useAuthStore } from "@/hooks/use-auth-store";
 import { getRefreshToken, refreshAccessToken } from "@/services";
-import { RequireRole } from "@/components/RequireRole";
-
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui";
 
 const featureHighlights = [
   {
@@ -50,7 +50,7 @@ const quickActions = [
   },
 ];
 
-export default function HomePage() {
+export function HomePage() {
   const { mutate: signOut, isPending: isSigningOut } = useSignOut();
   const { data, isError, error, isLoading, isFetching, refetch } = useUserProfile();
   const { mutate: seedEmails, isPending: isSeedingEmails } = useSeedMockEmails();
@@ -58,7 +58,6 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!accessToken) {
-      // if there's a refresh token, try to refresh silently
       if (getRefreshToken()) {
         (async () => {
           const t = await refreshAccessToken();
@@ -87,24 +86,20 @@ export default function HomePage() {
           <CardContent className="flex flex-wrap gap-3">
             <Button asChild>
               <Link to="/inbox">
-                <Mail className="mr-2 h-4 w-4" />
+                <Mail className="mr-2 size-4" />
                 Go to Inbox
               </Link>
             </Button>
             <Button asChild variant="secondary">
               <Link to="/profile">Go to profile</Link>
             </Button>
-            <Button 
-              variant="secondary" 
-              onClick={() => seedEmails()} 
-              disabled={isSeedingEmails}
-            >
+            <Button variant="secondary" onClick={() => seedEmails()} disabled={isSeedingEmails}>
               {isSeedingEmails ? "Seeding..." : "Seed Mock Emails"}
             </Button>
-            <RequireRole role="admin">
+            <RequireRole role={UserRole.ADMIN}>
               <Button asChild variant="secondary">
                 <Link to="/admin">
-                  <Shield className="mr-2 h-4 w-4" />
+                  <Shield className="mr-2 size-4" />
                   Admin Panel
                 </Link>
               </Button>
@@ -134,11 +129,7 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => refetch()}
-                disabled={isFetching}
-              >
+              <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
                 {isFetching ? "Retrying..." : "Try again"}
               </Button>
               <Button variant="outline" onClick={() => signOut()} disabled={isSigningOut}>

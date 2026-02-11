@@ -1,31 +1,11 @@
-import apiClient from './apiClient';
+import type { CreateDraftDto, Draft, UpdateDraftDto } from "@/types/draft";
 
-export interface Draft {
-  _id: string;
-  userId: string;
-  to: string;
-  subject: string;
-  body: string;
-  cc?: string;
-  bcc?: string;
-  replyTo?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import apiClient from "./api-client";
 
-export interface CreateDraftDto {
-  to: string;
-  subject: string;
-  body: string;
-  cc?: string;
-  bcc?: string;
-  replyTo?: string;
-}
-
-export interface UpdateDraftDto extends Partial<CreateDraftDto> {}
+export type { CreateDraftDto, Draft, UpdateDraftDto } from "@/types/draft";
 
 export async function getDrafts(): Promise<Draft[]> {
-  const response = await apiClient.get('email/drafts');
+  const response = await apiClient.get("email/drafts");
   return response.data;
 }
 
@@ -35,7 +15,7 @@ export async function getDraft(draftId: string): Promise<Draft> {
 }
 
 export async function createDraft(draftDto: CreateDraftDto): Promise<Draft> {
-  const response = await apiClient.post('email/drafts', draftDto);
+  const response = await apiClient.post("email/drafts", draftDto);
   return response.data;
 }
 

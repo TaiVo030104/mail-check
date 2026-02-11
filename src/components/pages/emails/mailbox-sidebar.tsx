@@ -1,7 +1,8 @@
-import { useMailboxes } from '@/hooks/react-query/useEmails';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Inbox, Star, Send, FileText, Archive, Trash2, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Archive, Clock, FileText, Inbox, Loader2, Send, Star, Trash2 } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { useMailboxes } from "@/hooks/react-query/use-emails";
+import { cn } from "@/lib/utils";
 
 interface MailboxSidebarProps {
   selectedFolder: string;
@@ -24,7 +25,7 @@ export function MailboxSidebar({ selectedFolder, onSelectFolder }: MailboxSideba
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -40,21 +41,16 @@ export function MailboxSidebar({ selectedFolder, onSelectFolder }: MailboxSideba
             key={mailbox.id}
             onClick={() => onSelectFolder(mailbox.id)}
             className={cn(
-              'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              isSelected
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-muted',
+              "flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isSelected ? "bg-primary text-primary-foreground" : "hover:bg-muted"
             )}
           >
             <div className="flex items-center gap-3">
-              <Icon className="h-4 w-4" />
+              <Icon className="size-4" />
               <span>{mailbox.name}</span>
             </div>
             {mailbox.count > 0 && (
-              <Badge
-                variant={isSelected ? 'secondary' : 'default'}
-                className="ml-auto"
-              >
+              <Badge variant={isSelected ? "secondary" : "default"} className="ml-auto">
                 {mailbox.count}
               </Badge>
             )}

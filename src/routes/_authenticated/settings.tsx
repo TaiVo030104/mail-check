@@ -1,11 +1,19 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Database,
+  Mail,
+  RefreshCw,
+  Settings as SettingsIcon,
+  User as UserIcon,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ensureAuthForRoute } from "@/hooks/useRequireAuth";
-import { ArrowLeft, Mail, RefreshCw, Database, User as UserIcon, Settings as SettingsIcon } from "lucide-react";
-import { useSeedMockEmails } from "@/hooks/react-query/useEmails";
-import { useUserProfile } from "@/hooks/react-query/useAuth";
 import { Separator } from "@/components/ui/separator";
+import { useUserProfile } from "@/hooks/react-query/use-auth";
+import { useSeedMockEmails } from "@/hooks/react-query/use-emails";
+import { ensureAuthForRoute } from "@/hooks/use-require-auth";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   beforeLoad: async () => {
@@ -28,19 +36,15 @@ function SettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        {/* Header with navigation */}
+        {}
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: '/inbox' })}
-          >
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/inbox" })}>
+            <ArrowLeft className="size-5" />
           </Button>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-slate-200 bg-white">
-                <SettingsIcon className="h-6 w-6 text-slate-700" />
+              <div className="flex size-12 items-center justify-center rounded-lg border-2 border-slate-200 bg-white">
+                <SettingsIcon className="size-6 text-slate-700" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
@@ -50,7 +54,7 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Account Information */}
+        {}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Account Information</CardTitle>
@@ -59,21 +63,25 @@ function SettingsPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-medium">Email Address</span>
-              <span className="text-sm text-muted-foreground">{profile?.email || 'Loading...'}</span>
+              <span className="text-sm text-muted-foreground">
+                {profile?.email || "Loading..."}
+              </span>
             </div>
             <Separator />
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-medium">Username</span>
-              <span className="text-sm text-muted-foreground">{profile?.username || 'Loading...'}</span>
+              <span className="text-sm text-muted-foreground">
+                {profile?.username || "Loading..."}
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Email Management */}
+        {}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-slate-700" />
+              <Mail className="size-5 text-slate-700" />
               <CardTitle className="text-lg font-semibold">Email Management</CardTitle>
             </div>
             <CardDescription>Manage your emails and inbox</CardDescription>
@@ -81,26 +89,27 @@ function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="rounded-lg border bg-muted/50 p-4">
               <div className="flex items-start gap-3">
-                <Database className="h-5 w-5 text-slate-700 mt-0.5" />
+                <Database className="mt-0.5 size-5 text-slate-700" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1">Seed Mock Emails</h3>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Generate 30 sample emails in your inbox for testing purposes. This will create mock emails with realistic content.
+                  <h3 className="mb-1 text-sm font-semibold">Seed Mock Emails</h3>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Generate 30 sample emails in your inbox for testing purposes. This will create
+                    mock emails with realistic content.
                   </p>
-                  <Button 
-                    variant="default" 
+                  <Button
+                    variant="default"
                     size="sm"
                     onClick={handleSeedEmails}
                     disabled={seedMutation.isPending}
                   >
                     {seedMutation.isPending ? (
                       <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        <RefreshCw className="mr-2 size-4 animate-spin" />
                         Seeding...
                       </>
                     ) : (
                       <>
-                        <Database className="mr-2 h-4 w-4" />
+                        <Database className="mr-2 size-4" />
                         Seed Emails
                       </>
                     )}
@@ -111,7 +120,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Preferences */}
+        {}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Email Preferences</CardTitle>
@@ -121,7 +130,9 @@ function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-sm font-medium">Email Notifications</p>
-                <p className="text-xs text-muted-foreground">Receive notifications for new emails</p>
+                <p className="text-xs text-muted-foreground">
+                  Receive notifications for new emails
+                </p>
               </div>
               <Button variant="outline" size="sm" disabled>
                 Coming Soon
@@ -131,7 +142,9 @@ function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-sm font-medium">Auto Mark as Read</p>
-                <p className="text-xs text-muted-foreground">Automatically mark emails as read when viewed</p>
+                <p className="text-xs text-muted-foreground">
+                  Automatically mark emails as read when viewed
+                </p>
               </div>
               <Button variant="outline" size="sm" disabled>
                 Coming Soon
@@ -150,24 +163,18 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
+        {}
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button 
-              variant="outline"
-              onClick={() => navigate({ to: '/inbox' })}
-            >
-              <Mail className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={() => navigate({ to: "/inbox" })}>
+              <Mail className="mr-2 size-4" />
               Back to Inbox
             </Button>
-            <Button 
-              variant="outline"
-              onClick={() => navigate({ to: '/profile' })}
-            >
-              <UserIcon className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={() => navigate({ to: "/profile" })}>
+              <UserIcon className="mr-2 size-4" />
               View Profile
             </Button>
           </CardContent>

@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { AttachmentPreview } from "@/components/AttachmentPreview";
+import { AttachmentPreview } from "@/components/attachment-preview";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -30,13 +30,12 @@ import {
   useMarkAsRead,
   useToggleStar,
   useUnsnoozeEmail,
-} from "@/hooks/react-query/useEmails";
+} from "@/hooks/react-query/use-emails";
 
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { ComposeDialog, ComposeMode } from "./compose-dialog";
 import { SnoozeDialog } from "./snooze-dialog";
 
-// Helper function to format file size
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -52,11 +51,9 @@ interface EmailDetailProps {
   onBack?: () => void;
 }
 
-// Sanitize HTML content - remove tracking pixels and malicious scripts
 function sanitizeEmailHtml(html: string): string {
   if (!html) return "";
 
-  // Remove tracking pixels and web beacons (1x1 images)
   let cleaned = html.replace(
     /<img[^>]*(?:src="[^"]*(?:gs-getmailtracker|mailtracker|pixel|beacon)[^"]*"[^>]*|[^>]*(?:width=["']?[01]["']?|height=["']?[01]["']?)[^>]*)>/gi,
     ""
@@ -68,7 +65,6 @@ function sanitizeEmailHtml(html: string): string {
   cleaned = cleaned.replace(/<object[^>]*>.*?<\/object>/gis, "");
   cleaned = cleaned.replace(/<embed[^>]*>/gi, "");
 
-  // Sanitize with DOMPurify to prevent XSS
   const sanitized = DOMPurify.sanitize(cleaned, {
     ALLOWED_TAGS: [
       "b",
@@ -131,7 +127,6 @@ function sanitizeEmailHtml(html: string): string {
       "cellspacing",
     ],
     ALLOW_DATA_ATTR: false,
-    // Allow all safe URIs including http/https/data for images
     ADD_ATTR: ["target"],
   });
 
@@ -176,7 +171,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
     downloadAttachmentMutation.mutate({
       attachmentId,
       filename,
-      emailId: email?.id, // Pass emailId for Gmail attachments
+      emailId: email?.id,
     });
   };
 
@@ -197,7 +192,6 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
 
   const handleOpenInGmail = () => {
     if (email?.gmailMessageId) {
-      // Open Gmail message in a new tab using the Gmail message ID
       const gmailUrl = `https://mail.google.com/mail/u/0/#all/${email.gmailMessageId}`;
       window.open(gmailUrl, "_blank", "noopener,noreferrer");
     }
@@ -205,11 +199,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
 
   const handleUnsnooze = () => {
     if (email) {
-      unsnoozeEmailMutation.mutate(email.id, {
-        onSuccess: () => {
-          // Email will be moved back to inbox automatically
-        },
-      });
+      unsnoozeEmailMutation.mutate(email.id);
     }
   };
 
@@ -254,7 +244,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
             </h2>
 
             {/* Snooze Status Banner */}
-            {(email.isSnoozed || email.labels?.includes('snoozed')) && email.snoozeUntil && (
+            {(email.isSnoozed || email.labels?.includes("snoozed")) && email.snoozeUntil && (
               <div className="mb-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-orange-950/20 md:mb-4">
                 <Clock3 className="size-4 shrink-0 text-orange-600 dark:text-orange-400" />
                 <div className="min-w-0 flex-1">
@@ -342,7 +332,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
             <Forward className="size-3.5 md:size-4" />
             <span className="hidden sm:inline">Forward</span>
           </Button>
-          {!(email.isSnoozed || email.labels?.includes('snoozed')) ? (
+          {!(email.isSnoozed || email.labels?.includes("snoozed")) ? (
             <Button
               variant="outline"
               size="sm"
@@ -509,7 +499,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         width: 100%;
         overflow-x: auto;
       }
-      
+
       .email-body-content {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-size: 14px;
@@ -518,18 +508,18 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         word-wrap: break-word;
         overflow-wrap: break-word;
       }
-      
+
       /* Let HTML render naturally - minimal constraints */
       .email-body-content * {
         max-width: 100%;
         box-sizing: border-box;
       }
-      
+
       /* Remove default borders from divs */
       .email-body-content div {
         border: none !important;
       }
-      
+
       /* Typography - preserve email styles */
       .email-body-content h1, .email-body-content h2, .email-body-content h3,
       .email-body-content h4, .email-body-content h5, .email-body-content h6 {
@@ -537,20 +527,20 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         margin-bottom: 0.5em;
         font-weight: 600;
       }
-      
+
       .email-body-content p {
         margin: 0.5em 0;
       }
-      
+
       .email-body-content a {
         color: #1a73e8;
         text-decoration: none;
       }
-      
+
       .email-body-content a:hover {
         text-decoration: underline;
       }
-      
+
       /* Images - Responsive and allow external sources */
       .email-body-content img {
         max-width: 100%;
@@ -559,18 +549,18 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         vertical-align: middle;
         loading: lazy;
       }
-      
+
       /* Allow images to load from any source */
       .email-body-content img[src] {
         content-visibility: auto;
       }
-      
+
       /* Lists */
       .email-body-content ul, .email-body-content ol {
         margin: 0.5em 0;
         padding-left: 2em;
       }
-      
+
       /* Blockquotes - subtle styling */
       .email-body-content blockquote {
         margin: 1em 0;
@@ -578,7 +568,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         border-left: 3px solid #dadce0;
         color: #5f6368;
       }
-      
+
       /* Code blocks */
       .email-body-content pre {
         background-color: #f8f9fa;
@@ -588,7 +578,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         font-family: 'Courier New', Courier, monospace;
         font-size: 13px;
       }
-      
+
       .email-body-content code {
         background-color: #f8f9fa;
         padding: 0.2em 0.4em;
@@ -596,23 +586,23 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         font-family: 'Courier New', Courier, monospace;
         font-size: 13px;
       }
-      
+
       .email-body-content pre code {
         background-color: transparent;
         padding: 0;
       }
-      
+
       /* Tables - preserve email table styling */
       .email-body-content table {
         border-collapse: collapse;
         margin: 1em 0;
       }
-      
+
       .email-body-content table th,
       .email-body-content table td {
         padding: 8px 12px;
       }
-      
+
       /* Gmail quoted text */
       .email-body-content .gmail_quote {
         margin: 1em 0;
@@ -620,7 +610,7 @@ export function EmailDetail({ emailId, onClose, onDelete, onBack }: EmailDetailP
         border-left: 2px solid #dadce0;
         color: #5f6368;
       }
-      
+
       /* Plain text emails */
       .email-body-plaintext {
         white-space: pre-wrap;

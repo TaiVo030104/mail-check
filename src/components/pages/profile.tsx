@@ -1,5 +1,13 @@
-import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, Loader2, Mail, Shield, User as UserIcon } from "lucide-react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -7,18 +15,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Mail, ArrowLeft, Shield, User as UserIcon } from "lucide-react";
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { useNavigate } from "@tanstack/react-router";
-
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useSignOut, useUserProfile } from "@/hooks/react-query/useAuth";
-import { useUserRole } from "@/hooks/useRole";
-import { Badge } from "@/components/ui/badge";
+import { UserRole } from "@/constants";
+import { useSignOut, useUserProfile } from "@/hooks/react-query/use-auth";
+import { useUserRole } from "@/hooks/use-role";
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -27,7 +28,7 @@ const formSchema = z.object({
 
 type FormInputs = z.infer<typeof formSchema>;
 
-export default function ProfilePage() {
+export function ProfilePage() {
   const navigate = useNavigate();
   const form = useForm<FormInputs>({
     defaultValues: {
@@ -53,19 +54,15 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        {/* Header with navigation */}
+        {}
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: '/inbox' })}
-          >
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/inbox" })}>
+            <ArrowLeft className="size-5" />
           </Button>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-slate-200 bg-white">
-                <UserIcon className="h-6 w-6 text-slate-700" />
+              <div className="flex size-12 items-center justify-center rounded-lg border-2 border-slate-200 bg-white">
+                <UserIcon className="size-6 text-slate-700" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
@@ -79,16 +76,16 @@ export default function ProfilePage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">Account Details</CardTitle>
+                <CardTitle className="text-lg font-semibold text-slate-900">
+                  Account Details
+                </CardTitle>
                 <CardDescription className="text-sm text-muted-foreground">
                   Your account information is read-only
                 </CardDescription>
               </div>
               {userRole && (
-                <Badge 
-                  variant={userRole === 'admin' ? 'default' : 'secondary'}
-                >
-                  {userRole === 'admin' && <Shield className="mr-1 h-3 w-3" />}
+                <Badge variant={userRole === UserRole.ADMIN ? "default" : "secondary"}>
+                  {userRole === UserRole.ADMIN && <Shield className="mr-1 size-3" />}
                   {userRole.toUpperCase()}
                 </Badge>
               )}
@@ -146,9 +143,9 @@ export default function ProfilePage() {
                       type="button"
                       variant="outline"
                       className="flex-1"
-                      onClick={() => navigate({ to: '/inbox' })}
+                      onClick={() => navigate({ to: "/inbox" })}
                     >
-                      <Mail className="mr-2 h-4 w-4" />
+                      <Mail className="mr-2 size-4" />
                       Back to Inbox
                     </Button>
                     <Button

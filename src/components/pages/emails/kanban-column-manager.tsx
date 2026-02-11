@@ -1,3 +1,7 @@
+import { Check, Edit2, Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,9 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
-import { Plus, Trash2, Edit2, Check, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface KanbanColumn {
   id: string;
@@ -23,7 +24,7 @@ interface KanbanColumnManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   columns: KanbanColumn[];
-  onAddColumn: (column: Omit<KanbanColumn, 'id'>) => void;
+  onAddColumn: (column: Omit<KanbanColumn, "id">) => void;
   onUpdateColumn: (id: string, column: Partial<KanbanColumn>) => void;
   onDeleteColumn: (id: string) => void;
 }
@@ -36,16 +37,16 @@ export function KanbanColumnManager({
   onUpdateColumn,
   onDeleteColumn,
 }: KanbanColumnManagerProps) {
-  const [newColumn, setNewColumn] = useState({ title: '', label: '', description: '' });
+  const [newColumn, setNewColumn] = useState({ title: "", label: "", description: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({ title: '', label: '', description: '' });
+  const [editValues, setEditValues] = useState({ title: "", label: "", description: "" });
 
-  const defaultColumns = ['inbox', 'todo', 'in-progress', 'done', 'snoozed'];
+  const defaultColumns = ["inbox", "todo", "in-progress", "done", "snoozed"];
 
   const handleAddColumn = () => {
     if (!newColumn.title || !newColumn.label) return;
     onAddColumn(newColumn);
-    setNewColumn({ title: '', label: '', description: '' });
+    setNewColumn({ title: "", label: "", description: "" });
   };
 
   const handleStartEdit = (column: KanbanColumn) => {
@@ -53,7 +54,7 @@ export function KanbanColumnManager({
     setEditValues({
       title: column.title,
       label: column.label,
-      description: column.description || '',
+      description: column.description || "",
     });
   };
 
@@ -71,41 +72,37 @@ export function KanbanColumnManager({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>Manage Kanban Columns</DialogTitle>
           <DialogDescription>
-            Add, edit, or remove custom columns for your Kanban board. Default columns cannot be deleted.
+            Add, edit, or remove custom columns for your Kanban board. Default columns cannot be
+            deleted.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Existing Columns */}
+          {}
           <div className="space-y-2">
             <Label>Existing Columns</Label>
-            <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-lg p-3">
+            <div className="max-h-[300px] space-y-2 overflow-y-auto rounded-lg border p-3">
               {columns.map((column) => (
                 <div
                   key={column.id}
-                  className="flex items-center gap-2 p-2 rounded border bg-muted/30"
+                  className="flex items-center gap-2 rounded border bg-muted/30 p-2"
                 >
                   {editingId === column.id ? (
-                    // Edit Mode
                     <>
-                      <div className="flex-1 grid grid-cols-2 gap-2">
+                      <div className="grid flex-1 grid-cols-2 gap-2">
                         <Input
                           value={editValues.title}
-                          onChange={(e) =>
-                            setEditValues({ ...editValues, title: e.target.value })
-                          }
+                          onChange={(e) => setEditValues({ ...editValues, title: e.target.value })}
                           placeholder="Title"
                           size={1}
                         />
                         <Input
                           value={editValues.label}
-                          onChange={(e) =>
-                            setEditValues({ ...editValues, label: e.target.value })
-                          }
+                          onChange={(e) => setEditValues({ ...editValues, label: e.target.value })}
                           placeholder="Label"
                           size={1}
                         />
@@ -123,21 +120,20 @@ export function KanbanColumnManager({
                         variant="ghost"
                         size="icon"
                         onClick={handleSaveEdit}
-                        className="h-8 w-8"
+                        className="size-8"
                       >
-                        <Check className="h-4 w-4 text-green-600" />
+                        <Check className="size-4 text-green-600" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={handleCancelEdit}
-                        className="h-8 w-8"
+                        className="size-8"
                       >
-                        <X className="h-4 w-4 text-red-600" />
+                        <X className="size-4 text-red-600" />
                       </Button>
                     </>
                   ) : (
-                    // View Mode
                     <>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -161,17 +157,17 @@ export function KanbanColumnManager({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleStartEdit(column)}
-                            className="h-8 w-8"
+                            className="size-8"
                           >
-                            <Edit2 className="h-4 w-4" />
+                            <Edit2 className="size-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => onDeleteColumn(column.id)}
-                            className="h-8 w-8 text-red-600 hover:text-red-700"
+                            className="size-8 text-red-600 hover:text-red-700"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </>
                       )}
@@ -182,7 +178,7 @@ export function KanbanColumnManager({
             </div>
           </div>
 
-          {/* Add New Column */}
+          {}
           <div className="space-y-2">
             <Label>Add New Column</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -204,7 +200,7 @@ export function KanbanColumnManager({
               />
             </div>
             <Button onClick={handleAddColumn} className="w-full">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 size-4" />
               Add Column
             </Button>
           </div>

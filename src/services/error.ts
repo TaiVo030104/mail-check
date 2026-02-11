@@ -2,10 +2,9 @@ import type { AxiosError } from "axios";
 
 export function getErrorMessage(err: unknown, fallback = "An error occurred") {
   if (err == null) return fallback;
-  // Axios error
-  const e = err as AxiosError | any;
+
+  const e = err as AxiosError<{ message?: string; error?: string } | string>;
   if (e?.isAxiosError) {
-    // try common shapes
     const data = e?.response?.data;
     if (data) {
       if (typeof data === "string") return data;
@@ -16,7 +15,6 @@ export function getErrorMessage(err: unknown, fallback = "An error occurred") {
     return fallback;
   }
 
-  // plain Error
   if (err instanceof Error) return err.message;
 
   try {
@@ -25,5 +23,3 @@ export function getErrorMessage(err: unknown, fallback = "An error occurred") {
     return fallback;
   }
 }
-
-export default getErrorMessage;

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Filter, X } from 'lucide-react';
+import { format } from "date-fns";
+import { Filter, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -10,13 +11,19 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 export interface EmailFilterValues {
   from?: string;
@@ -25,7 +32,7 @@ export interface EmailFilterValues {
   startDate?: Date;
   endDate?: Date;
   hasAttachments?: boolean;
-  sort?: 'newest' | 'oldest' | 'sender-asc' | 'sender-desc';
+  sort?: "newest" | "oldest" | "sender-asc" | "sender-desc";
 }
 
 interface EmailFiltersProps {
@@ -43,12 +50,12 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
   }, [filters]);
 
   const handleApplyFilters = () => {
-    onFiltersChange({ ...localFilters, sort: localFilters.sort || 'newest' });
+    onFiltersChange({ ...localFilters, sort: localFilters.sort || "newest" });
     setIsOpen(false);
   };
 
   const handleClearFilters = () => {
-    setLocalFilters({ sort: 'newest' });
+    setLocalFilters({ sort: "newest" });
     onClearFilters();
     setIsOpen(false);
   };
@@ -60,25 +67,25 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
     filters.startDate,
     filters.endDate,
     filters.hasAttachments ? true : undefined,
-  ].filter((value) => value !== undefined && value !== '').length;
+  ].filter((value) => value !== undefined && value !== "").length;
 
   const hasActiveFilters = activeFiltersCount > 0;
 
   return (
-    <div className={cn('flex items-center gap-2')}>
-      {/* Advanced Filters */}
+    <div className={cn("flex items-center gap-2")}>
+      {}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button 
-            variant={hasActiveFilters ? "default" : "outline"} 
-            size="sm" 
-            className="gap-2 h-9"
+          <Button
+            variant={hasActiveFilters ? "default" : "outline"}
+            size="sm"
+            className="h-9 gap-2"
             aria-label="Open filters"
           >
-            <Filter className="h-4 w-4" />
+            <Filter className="size-4" />
             <span className="hidden sm:inline">Filters</span>
             {hasActiveFilters && (
-              <span className="h-5 w-5 rounded-full bg-primary-foreground text-primary text-xs flex items-center justify-center font-semibold">
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-foreground text-xs font-semibold text-primary">
                 {activeFiltersCount}
               </span>
             )}
@@ -87,56 +94,56 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
         <DialogContent className="max-w-lg sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Filter Emails</DialogTitle>
-            <DialogDescription>
-              Narrow down your search with advanced filters
-            </DialogDescription>
+            <DialogDescription>Narrow down your search with advanced filters</DialogDescription>
           </DialogHeader>
 
           <div className="mt-6 space-y-6">
-            {/* From Filter */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="from-filter">From</Label>
               <Input
                 id="from-filter"
                 type="email"
                 placeholder="sender@example.com"
-                value={localFilters.from || ''}
-                onChange={(e) => setLocalFilters({ ...localFilters, from: e.target.value || undefined })}
+                value={localFilters.from || ""}
+                onChange={(e) =>
+                  setLocalFilters({ ...localFilters, from: e.target.value || undefined })
+                }
               />
             </div>
 
-            {/* Status Filters */}
+            {}
             <div className="space-y-4">
               <Label>Status</Label>
-              
+
               <div className="flex items-center justify-between">
-                <Label htmlFor="unread-filter" className="font-normal cursor-pointer">
+                <Label htmlFor="unread-filter" className="cursor-pointer font-normal">
                   Unread only
                 </Label>
                 <Switch
                   id="unread-filter"
                   checked={localFilters.unread || false}
-                  onCheckedChange={(checked: boolean) => 
+                  onCheckedChange={(checked: boolean) =>
                     setLocalFilters({ ...localFilters, unread: checked ? true : undefined })
                   }
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <Label htmlFor="starred-filter" className="font-normal cursor-pointer">
+                <Label htmlFor="starred-filter" className="cursor-pointer font-normal">
                   Starred only
                 </Label>
                 <Switch
                   id="starred-filter"
                   checked={localFilters.starred || false}
-                  onCheckedChange={(checked: boolean) => 
+                  onCheckedChange={(checked: boolean) =>
                     setLocalFilters({ ...localFilters, starred: checked ? true : undefined })
                   }
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <Label htmlFor="attachments-filter" className="font-normal cursor-pointer">
+                <Label htmlFor="attachments-filter" className="cursor-pointer font-normal">
                   Has attachment
                 </Label>
                 <Switch
@@ -149,10 +156,10 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
               </div>
             </div>
 
-            {/* Date Range */}
+            {}
             <div className="space-y-3">
               <Label>Date Range</Label>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="start-date" className="text-xs text-muted-foreground">
                   From
@@ -178,7 +185,7 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
                     <Calendar
                       mode="single"
                       selected={localFilters.startDate}
-                      onSelect={(date: Date | undefined) => 
+                      onSelect={(date: Date | undefined) =>
                         setLocalFilters({ ...localFilters, startDate: date || undefined })
                       }
                       initialFocus
@@ -212,7 +219,7 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
                     <Calendar
                       mode="single"
                       selected={localFilters.endDate}
-                      onSelect={(date: Date | undefined) => 
+                      onSelect={(date: Date | undefined) =>
                         setLocalFilters({ ...localFilters, endDate: date || undefined })
                       }
                       initialFocus
@@ -222,15 +229,15 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
               </div>
             </div>
 
-            {/* Sorting */}
+            {}
             <div className="space-y-2">
               <Label htmlFor="sort-order">Sort</Label>
               <Select
-                value={localFilters.sort || 'newest'}
+                value={localFilters.sort || "newest"}
                 onValueChange={(value) =>
                   setLocalFilters({
                     ...localFilters,
-                    sort: value as EmailFilterValues['sort'],
+                    sort: value as EmailFilterValues["sort"],
                   })
                 }
               >
@@ -246,20 +253,13 @@ export function EmailFilters({ filters, onFiltersChange, onClearFilters }: Email
               </Select>
             </div>
 
-            {/* Action Buttons */}
+            {}
             <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleClearFilters}
-              >
-                <X className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="flex-1" onClick={handleClearFilters}>
+                <X className="mr-2 size-4" />
                 Clear All
               </Button>
-              <Button
-                className="flex-1"
-                onClick={handleApplyFilters}
-              >
+              <Button className="flex-1" onClick={handleApplyFilters}>
                 Apply Filters
               </Button>
             </div>

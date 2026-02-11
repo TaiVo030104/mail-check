@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from "lucide-react";
+import { Suspense } from "react";
 
 interface LazyLoadWrapperProps {
   children: React.ReactNode;
@@ -8,14 +8,10 @@ interface LazyLoadWrapperProps {
 
 export function LazyLoadWrapper({ children, fallback }: LazyLoadWrapperProps) {
   const defaultFallback = (
-    <div className="flex items-center justify-center min-h-screen">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex min-h-screen items-center justify-center">
+      <Loader2 className="size-8 animate-spin text-primary" />
     </div>
   );
 
-  return (
-    <Suspense fallback={fallback || defaultFallback}>
-      {children}
-    </Suspense>
-  );
+  return <Suspense fallback={fallback || defaultFallback}>{children}</Suspense>;
 }
