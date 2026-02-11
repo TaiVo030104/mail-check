@@ -1,17 +1,26 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useSendEmail, useUploadAttachment } from '@/hooks/react-query/useEmails';
-import { useCreateDraft, useUpdateDraft } from '@/hooks/react-query/useDrafts';
-import { Loader2, Paperclip, X, FileIcon, ChevronDown, ChevronUp } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
-import { AttachmentDto, EmailDetail } from '@/services/email';
-import { useToast } from '@/hooks/use-toast';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ChevronDown, ChevronUp, FileIcon, Loader2, Paperclip, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { AUTO_SAVE_INTERVAL_MS, MAX_ATTACHMENT_SIZE } from "@/constants";
+import { useCreateDraft, useDeleteDraft, useUpdateDraft } from "@/hooks/react-query/use-drafts";
+import { useSendEmail, useUploadAttachment } from "@/hooks/react-query/use-emails";
+import { useToast } from "@/hooks/use-toast";
+import type { AttachmentDto, EmailDetail } from "@/types/email";
 
 function extractEmailAddress(emailString: string): string {
   if (!emailString) return "";
@@ -57,22 +66,27 @@ interface ComposeDialogProps {
   };
 }
 
-// Helper function to format file size
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return "0 Bytes";
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, initialData }: ComposeDialogProps) {
+export function ComposeDialog({
+  open,
+  onOpenChange,
+  mode = "compose",
+  draftId,
+  initialData,
+}: ComposeDialogProps) {
   const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(draftId || null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showQuotedText, setShowQuotedText] = useState(false);
-  const [quotedText, setQuotedText] = useState<string>('');
+  const [quotedText, setQuotedText] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -90,21 +104,21 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
   const uploadAttachmentMutation = useUploadAttachment();
   const createDraftMutation = useCreateDraft();
   const updateDraftMutation = useUpdateDraft();
+  const deleteDraftMutation = useDeleteDraft();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    
+
     try {
       for (const file of Array.from(files)) {
-        // Check file size (max 25MB)
-        if (file.size > 25 * 1024 * 1024) {
+        if (file.size > MAX_ATTACHMENT_SIZE) {
           toast({
-            title: 'Error',
+            title: "Error",
             description: `File "${file.name}" exceeds the 25MB limit`,
-            variant: 'destructive',
+            variant: "destructive",
           });
           continue;
         }
@@ -112,17 +126,18 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
         const result = await uploadAttachmentMutation.mutateAsync(file);
         setAttachments((prev) => [...prev, result]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
       toast({
-        title: 'Upload Failed',
-        description: error.response?.data?.message || 'Failed to upload attachment',
-        variant: 'destructive',
+        title: "Upload Failed",
+        description: axiosErr.response?.data?.message || "Failed to upload attachment",
+        variant: "destructive",
       });
     } finally {
       setIsUploading(false);
-      // Reset file input
+
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
@@ -137,7 +152,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
       setAttachments([]);
       setCurrentDraftId(null);
       setLastSaved(null);
-      // Clear auto-save timer
+
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
@@ -146,21 +161,19 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
     onOpenChange(open);
   };
 
-  // Auto-save draft every 30 seconds
   useEffect(() => {
     if (!open) return;
 
     const saveDraft = async () => {
       const values = form.getValues();
-      
-      // Only save if there's content
+
       if (!values.to && !values.subject && !values.body) return;
 
       try {
         const draftData = {
-          to: values.to || '',
-          subject: values.subject || '',
-          body: values.body || '',
+          to: values.to || "",
+          subject: values.subject || "",
+          body: values.body || "",
         };
 
         if (currentDraftId) {
@@ -172,16 +185,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
           const draft = await createDraftMutation.mutateAsync(draftData);
           setCurrentDraftId(draft._id);
         }
-        
+
         setLastSaved(new Date());
-      } catch (error) {
-        // Silent fail for auto-save
-        console.error('Auto-save failed:', error);
+      } catch {
+        // ignore - auto-save failure is non-critical
       }
     };
 
-    // Start auto-save timer
-    autoSaveTimerRef.current = setInterval(saveDraft, 30000); // 30 seconds
+    autoSaveTimerRef.current = setInterval(saveDraft, AUTO_SAVE_INTERVAL_MS);
 
     return () => {
       if (autoSaveTimerRef.current) {
@@ -189,41 +200,6 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
       }
     };
   }, [open, currentDraftId, form, createDraftMutation, updateDraftMutation]);
-
-  // Manual save draft
-  // const handleSaveDraft = async () => {
-  //   const values = form.getValues();
-    
-  //   try {
-  //     const draftData = {
-  //       to: values.to || '',
-  //       subject: values.subject || '',
-  //       body: values.body || '',
-  //     };
-
-  //     if (currentDraftId) {
-  //       await updateDraftMutation.mutateAsync({
-  //         draftId: currentDraftId,
-  //         updateDto: draftData,
-  //       });
-  //     } else {
-  //       const draft = await createDraftMutation.mutateAsync(draftData);
-  //       setCurrentDraftId(draft._id);
-  //     }
-      
-  //     setLastSaved(new Date());
-  //     toast({
-  //       title: 'Draft saved',
-  //       description: 'Your draft has been saved successfully',
-  //     });
-  //   } catch (error: any) {
-  //     toast({
-  //       title: 'Failed to save draft',
-  //       description: error.message || 'An error occurred',
-  //       variant: 'destructive',
-  //     });
-  //   }
-  // };
 
   useEffect(() => {
     if (open && initialData?.email) {
@@ -262,7 +238,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
           body: initialData.body || "",
         });
       } else {
-        setQuotedText('');
+        setQuotedText("");
         form.reset({
           to: initialData.to || "",
           subject: initialData.subject || "",
@@ -270,14 +246,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
         });
       }
     } else if (open && initialData) {
-      setQuotedText('');
+      setQuotedText("");
       form.reset({
         to: initialData.to || "",
         subject: initialData.subject || "",
         body: initialData.body || "",
       });
     } else if (open) {
-      setQuotedText('');
+      setQuotedText("");
       form.reset({
         to: "",
         subject: "",
@@ -287,12 +263,10 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
   }, [open, mode, initialData, form]);
 
   const onSubmit = async (data: FormInputs) => {
-    // Combine body with quoted text if present
     const fullBody = quotedText ? `${data.body}${quotedText}` : data.body;
-    
+
     if (mode === "reply" || mode === "replyAll") {
       if (initialData?.email) {
-        // For reply, we need to send as a new email with reply info
         sendEmailMutation.mutate(
           {
             to: data.to,
@@ -304,7 +278,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
             onSuccess: () => {
               form.reset();
               setAttachments([]);
-              setQuotedText('');
+              setQuotedText("");
               onOpenChange(false);
             },
           }
@@ -321,15 +295,14 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
           onSuccess: () => {
             form.reset();
             setAttachments([]);
-            setQuotedText('');
-            // Delete draft after successful send
+            setQuotedText("");
+
             if (currentDraftId) {
-              fetch(`/api/email/drafts/${currentDraftId}`, { method: 'DELETE' })
-                .catch(() => {}); // Silent fail
+              deleteDraftMutation.mutate(currentDraftId);
             }
             onOpenChange(false);
           },
-        },
+        }
       );
     }
   };
@@ -349,7 +322,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto w-[calc(100vw-2rem)] md:w-full">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto md:max-h-[85vh] md:w-full">
         <DialogHeader>
           <DialogTitle className="text-lg md:text-xl">{getTitle()}</DialogTitle>
         </DialogHeader>
@@ -396,11 +369,11 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
                 <FormItem>
                   <FormLabel>Message</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Type your message here..." 
-                      rows={8} 
-                      className="min-h-[150px] md:min-h-[200px]" 
-                      {...field} 
+                    <Textarea
+                      placeholder="Type your message here..."
+                      rows={8}
+                      className="min-h-[150px] md:min-h-[200px]"
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -408,23 +381,27 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
               )}
             />
 
-            {/* Quoted Text Section (Gmail-style) */}
+            {}
             {quotedText && (mode === "reply" || mode === "replyAll" || mode === "forward") && (
-              <div className="border rounded-md overflow-hidden">
+              <div className="overflow-hidden rounded-md border">
                 <button
                   type="button"
                   onClick={() => setShowQuotedText(!showQuotedText)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hover:bg-muted transition-colors text-sm text-muted-foreground"
+                  className="flex w-full items-center justify-between bg-muted/50 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
                 >
                   <span className="flex items-center gap-2">
-                    {showQuotedText ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {showQuotedText ? (
+                      <ChevronUp className="size-4" />
+                    ) : (
+                      <ChevronDown className="size-4" />
+                    )}
                     {mode === "forward" ? "Forwarded message" : "Original message"}
                   </span>
-                  <span className="text-xs">Click to {showQuotedText ? 'hide' : 'show'}</span>
+                  <span className="text-xs">Click to {showQuotedText ? "hide" : "show"}</span>
                 </button>
                 {showQuotedText && (
-                  <div className="p-3 bg-muted/30 border-t">
-                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans">
+                  <div className="border-t bg-muted/30 p-3">
+                    <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground">
                       {quotedText}
                     </pre>
                   </div>
@@ -432,7 +409,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
               </div>
             )}
 
-            {/* Attachments Section */}
+            {}
             {attachments.length > 0 && (
               <div className="space-y-2">
                 <FormLabel>Attachments</FormLabel>
@@ -440,24 +417,24 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.attachmentId}
-                      className="flex items-center justify-between gap-2 bg-muted px-3 py-2 rounded-md text-sm"
+                      className="flex items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm"
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <FileIcon className="size-4 shrink-0 text-muted-foreground" />
                         <span className="truncate" title={attachment.filename}>
                           {attachment.filename}
                         </span>
-                        <span className="text-muted-foreground text-xs whitespace-nowrap">
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">
                           ({formatFileSize(attachment.size)})
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => removeAttachment(attachment.attachmentId)}
-                        className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                        className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
                         aria-label="Remove attachment"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="size-4" />
                       </button>
                     </div>
                   ))}
@@ -465,7 +442,7 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
               </div>
             )}
 
-            {/* Hidden file input */}
+            {}
             <input
               ref={fileInputRef}
               type="file"
@@ -475,9 +452,9 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
               accept="*/*"
             />
 
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Attachment button - available for all modes */}
+            <div className="flex flex-col items-stretch justify-between gap-3 pt-2 sm:flex-row sm:items-center">
+              <div className="flex flex-wrap items-center gap-2">
+                {}
                 <Button
                   type="button"
                   variant="outline"
@@ -486,40 +463,28 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
                   disabled={isUploading}
                 >
                   {isUploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 size-4 animate-spin" />
                   ) : (
-                    <Paperclip className="mr-2 h-4 w-4" />
+                    <Paperclip className="mr-2 size-4" />
                   )}
-                  {isUploading ? 'Uploading...' : 'Attach'}
+                  {isUploading ? "Uploading..." : "Attach"}
                 </Button>
 
-                {/* Save Draft button */}
-                {/* <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveDraft}
-                  disabled={createDraftMutation.isPending || updateDraftMutation.isPending}
-                >
-                  {(createDraftMutation.isPending || updateDraftMutation.isPending) ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                  )}
-                  Save
-                </Button> */}
+                {}
+                {}
 
-                {/* Auto-save indicator */}
+                {}
                 {lastSaved && (
                   <span className="text-xs text-muted-foreground">
-                    Saved {new Date().getTime() - lastSaved.getTime() < 60000 
-                      ? 'just now' 
+                    Saved{" "}
+                    {new Date().getTime() - lastSaved.getTime() < 60000
+                      ? "just now"
                       : `${Math.floor((new Date().getTime() - lastSaved.getTime()) / 60000)}m ago`}
                   </span>
                 )}
               </div>
 
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -528,15 +493,17 @@ export function ComposeDialog({ open, onOpenChange, mode = "compose", draftId, i
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={sendEmailMutation.isPending || isUploading}
                   className="flex-1 sm:flex-none"
                 >
-                  {sendEmailMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {mode === "reply" || mode === "replyAll" ? "Reply" : mode === "forward" ? "Forward" : "Send"}
+                  {sendEmailMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  {mode === "reply" || mode === "replyAll"
+                    ? "Reply"
+                    : mode === "forward"
+                      ? "Forward"
+                      : "Send"}
                 </Button>
               </div>
             </div>

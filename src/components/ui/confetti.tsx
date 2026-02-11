@@ -1,3 +1,9 @@
+import type {
+  CreateTypes as ConfettiInstance,
+  GlobalOptions as ConfettiGlobalOptions,
+  Options as ConfettiOptions,
+} from "canvas-confetti";
+import confetti from "canvas-confetti";
 import type { ReactNode } from "react";
 import React, {
   createContext,
@@ -8,12 +14,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import type {
-  GlobalOptions as ConfettiGlobalOptions,
-  CreateTypes as ConfettiInstance,
-  Options as ConfettiOptions,
-} from "canvas-confetti";
-import confetti from "canvas-confetti";
 
 import { Button, ButtonProps } from "@/components/ui/button";
 
@@ -40,41 +40,36 @@ const Confetti = forwardRef<ConfettiRef, Props>((props, ref) => {
     children,
     ...rest
   } = props;
-  const instanceRef = useRef<ConfettiInstance | null>(null); // confetti instance
+  const instanceRef = useRef<ConfettiInstance | null>(null);
 
   const canvasRef = useCallback(
-    // https://react.dev/reference/react-dom/components/common#ref-callback
-    // https://reactjs.org/docs/refs-and-the-dom.html#callback-refs
     (node: HTMLCanvasElement) => {
       if (node !== null) {
-        // <canvas> is mounted => create the confetti instance
-        if (instanceRef.current) return; // if not already created
+        if (instanceRef.current) return;
         instanceRef.current = confetti.create(node, {
           ...globalOptions,
           resize: true,
         });
       } else {
-        // <canvas> is unmounted => reset and destroy instanceRef
         if (instanceRef.current) {
           instanceRef.current.reset();
           instanceRef.current = null;
         }
       }
     },
-    [globalOptions],
+    [globalOptions]
   );
 
-  // `fire` is a function that calls the instance() with `opts` merged with `options`
   const fire = useCallback(
     (opts = {}) => instanceRef.current?.({ ...options, ...opts }),
-    [options],
+    [options]
   );
 
   const api = useMemo(
     () => ({
       fire,
     }),
-    [fire],
+    [fire]
   );
 
   useImperativeHandle(ref, () => api, [api]);
@@ -94,8 +89,7 @@ const Confetti = forwardRef<ConfettiRef, Props>((props, ref) => {
 });
 
 interface ConfettiButtonProps extends ButtonProps {
-  options?: ConfettiOptions &
-    ConfettiGlobalOptions & { canvas?: HTMLCanvasElement };
+  options?: ConfettiOptions & ConfettiGlobalOptions & { canvas?: HTMLCanvasElement };
   children?: React.ReactNode;
 }
 

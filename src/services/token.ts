@@ -1,47 +1,29 @@
-const REFRESH_TOKEN_KEY = "auth_refresh_token";
+import { STORAGE_KEYS } from "@/constants";
 
-/**
- * Get refresh token from localStorage
- * Note: If backend uses httpOnly cookies, this will return null
- * and the cookie will be sent automatically with requests
- */
 export const getRefreshToken = (): string | null => {
   try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
+    return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   } catch {
     return null;
   }
 };
 
-/**
- * Set refresh token in localStorage
- * Note: Only use this if backend doesn't use httpOnly cookies
- */
 export const setRefreshToken = (token: string) => {
   try {
-    localStorage.setItem(REFRESH_TOKEN_KEY, token);
-  } catch {}
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
+  } catch {
+    // ignore - storage unavailable
+  }
 };
 
-/**
- * Clear refresh token from localStorage
- */
 export const clearRefreshToken = () => {
   try {
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  } catch {}
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  } catch {
+    // ignore - storage unavailable
+  }
 };
 
-/**
- * Clear all tokens (localStorage only, cookies are managed by backend)
- */
 export const clearAllTokens = () => {
   clearRefreshToken();
-};
-
-export default {
-  getRefreshToken,
-  setRefreshToken,
-  clearRefreshToken,
-  clearAllTokens,
 };

@@ -1,31 +1,13 @@
-import api, { apiAuth, refreshAccessToken } from "@/services/apiClient";
-import { setRefreshToken, clearAllTokens } from "./token";
-import { useAuthStore } from "@/hooks/useAuthStore";
-import { getErrorMessage } from "./error";
-import { authSync } from "./authSync";
 import { USE_COOKIE_AUTH } from "@/config/env";
+import { useAuthStore } from "@/hooks/use-auth-store";
+import api, { apiAuth, refreshAccessToken } from "@/services/api-client";
+import type { AuthInfo, AuthUser, SignInParams, SignUpParams } from "@/types/auth";
 
-export type AuthInfo = {
-  accessToken: string;
-  refreshToken?: string;
-};
+import { authSync } from "./auth-sync";
+import { getErrorMessage } from "./error";
+import { clearAllTokens, setRefreshToken } from "./token";
 
-type SignInParams = {
-  email: string;
-  password: string;
-};
-
-type SignUpParams = {
-  username: string;
-  password: string;
-};
-
-export type AuthUser = {
-  username: string;
-  email: string;
-  role: string;
-  picture?: string;
-};
+export type { AuthInfo, AuthUser, SignInParams, SignUpParams } from "@/types/auth";
 
 const USE_COOKIES = USE_COOKIE_AUTH;
 
@@ -33,20 +15,19 @@ export const signIn = async (params: SignInParams) => {
   try {
     const resp = await apiAuth.post("/login", params);
     const data = resp.data as AuthInfo;
-    
-    // Only store refresh token if backend sends it (localStorage mode)
+
     if (data.refreshToken && !USE_COOKIES) {
       setRefreshToken(data.refreshToken);
     }
-    
+
     if (data.accessToken) {
       const store = useAuthStore.getState();
       store.setAccessToken(data.accessToken);
-      // Schedule silent refresh before token expires
+
       store.scheduleTokenRefresh(async () => {
         await refreshAccessToken();
       });
-      // Broadcast login to other tabs
+
       authSync.broadcastLogin(data.accessToken);
     }
     return data;
@@ -66,16 +47,15 @@ export const signUp = async (params: SignUpParams) => {
 
 export const signOut = async () => {
   try {
-    // optionally inform backend
     await apiAuth.post("/logout");
   } catch {
-    // ignore errors during logout call
+    // ignore - logout endpoint failure is non-critical
   }
   clearAllTokens();
   const store = useAuthStore.getState();
   store.clearAccessToken();
   store.clearRefreshTimer();
-  // Broadcast logout to other tabs
+
   authSync.broadcastLogout();
   return Promise.resolve();
 };

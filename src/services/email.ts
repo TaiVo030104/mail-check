@@ -1,108 +1,35 @@
-import api from './apiClient';
+import type {
+  Attachment,
+  Email,
+  EmailDetail,
+  EmailFilters,
+  EmailListResponse,
+  EmailSelectionResponse,
+  Mailbox,
+  ReplyEmailDto,
+  SendEmailDto,
+  UploadAttachmentResponse,
+} from "@/types/email";
 
-export interface Mailbox {
-  id: string;
-  name: string;
-  count: number;
-  icon: string;
-}
+import api from "./api-client";
 
-export interface Attachment {
-  id: string;
-  attachmentId: string;
-  filename: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  s3Key: string;
-}
-
-export interface AttachmentDto {
-  attachmentId: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-  s3Key: string;
-}
-
-export interface Email {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  preview: string;
-  isRead: boolean;
-  isStarred: boolean;
-  sentAt: string;
-  folder: string;
-  attachments?: Attachment[];
-  hasAttachments?: boolean;
-  labels?: string[];
-  priority?: 'high' | 'normal' | 'low';
-  isSnoozed?: boolean;
-  snoozeUntil?: string;
-  snoozedAt?: string;
-  aiSummary?: string;
-  summarizedAt?: string;
-  gmailMessageId?: string; // Gmail message ID for "Open in Gmail" feature
-}
-
-export interface EmailDetail extends Email {
-  body: string;
-  readAt: string;
-  attachments?: Attachment[];
-  cc?: string;
-}
-
-export interface EmailListResponse {
-  emails: Email[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  nextPageToken?: string;
-  hasMore: boolean;
-}
-
-export interface EmailSelectionResponse {
-  emailIds: string[];
-  total: number;
-}
-
-export interface SendEmailDto {
-  to: string;
-  subject: string;
-  body: string;
-  attachments?: AttachmentDto[];
-}
-
-export interface UploadAttachmentResponse {
-  attachmentId: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-  s3Key: string;
-}
-
-export interface ReplyEmailDto {
-  body: string;
-  replyAll?: boolean;
-}
-
-export interface EmailFilters {
-  search?: string;
-  from?: string;
-  unread?: boolean;
-  starred?: boolean;
-  startDate?: Date;
-  endDate?: Date;
-  hasAttachments?: boolean;
-  sort?: 'newest' | 'oldest' | 'sender-asc' | 'sender-desc';
-}
+export type {
+  Attachment,
+  AttachmentDto,
+  Email,
+  EmailDetail,
+  EmailFilters,
+  EmailListResponse,
+  EmailSelectionResponse,
+  Mailbox,
+  ReplyEmailDto,
+  SendEmailDto,
+  UploadAttachmentResponse,
+} from "@/types/email";
 
 export const emailService = {
   async getMailboxes(): Promise<Mailbox[]> {
-    const response = await api.get('emails/mailboxes');
+    const response = await api.get("emails/mailboxes");
     return response.data;
   },
 
@@ -110,10 +37,10 @@ export const emailService = {
     folder: string,
     page: number = 1,
     limit: number = 50,
-    filters?: EmailFilters,
+    filters?: EmailFilters
   ): Promise<EmailListResponse> {
-    const params: any = { page, limit };
-    
+    const params: Record<string, string | number | boolean> = { page, limit };
+
     if (filters) {
       if (filters.search) params.search = filters.search;
       if (filters.from) params.from = filters.from;
@@ -124,16 +51,13 @@ export const emailService = {
       if (filters.hasAttachments !== undefined) params.hasAttachments = filters.hasAttachments;
       if (filters.sort) params.sort = filters.sort;
     }
-    
+
     const response = await api.get(`emails/folder/${folder}`, { params });
     return response.data;
   },
 
-  async getEmailSelection(
-    folder: string,
-    filters?: EmailFilters,
-  ): Promise<EmailSelectionResponse> {
-    const params: any = {};
+  async getEmailSelection(folder: string, filters?: EmailFilters): Promise<EmailSelectionResponse> {
+    const params: Record<string, string | number | boolean> = {};
 
     if (filters) {
       if (filters.search) params.search = filters.search;
@@ -156,7 +80,7 @@ export const emailService = {
   },
 
   async sendEmail(data: SendEmailDto): Promise<{ message: string }> {
-    const response = await api.post('emails/send', data);
+    const response = await api.post("emails/send", data);
     return response.data;
   },
 
@@ -181,17 +105,16 @@ export const emailService = {
   },
 
   async seedMockEmails(): Promise<{ message: string }> {
-    const response = await api.post('emails/seed');
+    const response = await api.post("emails/seed");
     return response.data;
   },
 
-  // Attachment functions
   async uploadAttachment(file: File): Promise<UploadAttachmentResponse> {
     const formData = new FormData();
-    formData.append('file', file);
-    const response = await api.post('emails/attachments/upload', formData, {
+    formData.append("file", file);
+    const response = await api.post("emails/attachments/upload", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     });
     return response.data;
@@ -200,36 +123,40 @@ export const emailService = {
   async uploadMultipleAttachments(files: File[]): Promise<UploadAttachmentResponse[]> {
     const formData = new FormData();
     files.forEach((file) => {
-      formData.append('files', file);
+      formData.append("files", file);
     });
-    const response = await api.post('emails/attachments/upload-multiple', formData, {
+    const response = await api.post("emails/attachments/upload-multiple", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     });
     return response.data;
   },
 
-  async getAttachmentDownloadUrl(attachmentId: string): Promise<{ url: string; expiresIn: number }> {
+  async getAttachmentDownloadUrl(
+    attachmentId: string
+  ): Promise<{ url: string; expiresIn: number }> {
     const response = await api.get(`emails/attachments/${attachmentId}/url`);
     return response.data;
   },
 
-  async downloadAttachment(attachmentId: string, filename: string, emailId?: string): Promise<void> {
-    // Unified endpoint - backend will determine if it's from provider (Gmail) or database/S3
+  async downloadAttachment(
+    attachmentId: string,
+    filename: string,
+    emailId?: string
+  ): Promise<void> {
     const params = emailId ? { emailId } : {};
     const endpoint = `emails/attachments/${attachmentId}/download`;
-      
+
     const response = await api.get(endpoint, {
       params,
-      responseType: 'blob',
+      responseType: "blob",
     });
-    
-    // Create blob link to download
+
     const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.setAttribute('download', filename);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -247,32 +174,47 @@ export const emailService = {
   },
 
   async bulkDelete(emailIds: string[]): Promise<{ message: string; deleted: number }> {
-    const response = await api.post('emails/bulk/delete', { emailIds });
+    const response = await api.post("emails/bulk/delete", { emailIds });
     return response.data;
   },
 
-  async bulkToggleStar(emailIds: string[], star: boolean): Promise<{ message: string; modified: number }> {
-    const response = await api.post('emails/bulk/star', { emailIds, star });
+  async bulkToggleStar(
+    emailIds: string[],
+    star: boolean
+  ): Promise<{ message: string; modified: number }> {
+    const response = await api.post("emails/bulk/star", { emailIds, star });
     return response.data;
   },
 
-  async bulkMarkAsRead(emailIds: string[], isRead: boolean): Promise<{ message: string; modified: number }> {
-    const response = await api.post('emails/bulk/read', { emailIds, isRead });
+  async bulkMarkAsRead(
+    emailIds: string[],
+    isRead: boolean
+  ): Promise<{ message: string; modified: number }> {
+    const response = await api.post("emails/bulk/read", { emailIds, isRead });
     return response.data;
   },
 
-  async updateEmailLabels(emailId: string, labels: string[]): Promise<{ message: string; labels: string[] }> {
+  async updateEmailLabels(
+    emailId: string,
+    labels: string[]
+  ): Promise<{ message: string; labels: string[] }> {
     const response = await api.put(`emails/${emailId}/labels`, { labels });
     return response.data;
   },
 
-  // Snooze features
-  async snoozeEmail(emailId: string, snoozeUntil: string): Promise<{ message: string; snoozeUntil: string }> {
+  async snoozeEmail(
+    emailId: string,
+    snoozeUntil: string
+  ): Promise<{ message: string; snoozeUntil: string }> {
     const response = await api.post(`email/snooze/${emailId}`, { snoozeUntil });
     return response.data;
   },
 
-  async snoozeEmailWithPreset(emailId: string, preset: string, customDate?: string): Promise<{ message: string; snoozeUntil: string }> {
+  async snoozeEmailWithPreset(
+    emailId: string,
+    preset: string,
+    customDate?: string
+  ): Promise<{ message: string; snoozeUntil: string }> {
     const response = await api.post(`email/snooze/${emailId}/preset`, { preset, customDate });
     return response.data;
   },
@@ -283,12 +225,13 @@ export const emailService = {
   },
 
   async getSnoozedEmails(): Promise<{ emails: Email[]; total: number }> {
-    const response = await api.get('email/snooze');
+    const response = await api.get("email/snooze");
     return response.data;
   },
 
-  // AI features
-  async summarizeEmail(emailId: string): Promise<{ summary: string; summarizedAt: string; cached: boolean }> {
+  async summarizeEmail(
+    emailId: string
+  ): Promise<{ summary: string; summarizedAt: string; cached: boolean }> {
     const response = await api.post(`email/ai/summarize/${emailId}`);
     return response.data;
   },

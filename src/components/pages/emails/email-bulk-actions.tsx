@@ -1,7 +1,8 @@
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Loader2, MailOpen, MailX, Star, StarOff, Trash2, X } from 'lucide-react';
+import { Loader2, MailOpen, MailX, Star, StarOff, Trash2, X } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 interface EmailBulkActionsProps {
   selectedCount: number;
@@ -35,13 +36,19 @@ export function EmailBulkActions({
   const isBusy = isDeleting || isMarking || isStarring;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-t bg-muted/30 px-3 py-2.5 text-sm md:px-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-muted/30 px-3 py-2.5 text-sm md:px-4">
       <div className="flex items-center gap-3">
         <Badge variant="secondary" className="text-xs">
           {selectedCount} selected
         </Badge>
-        <Button variant="ghost" size="sm" onClick={onClearSelection} disabled={isBusy} className="gap-1">
-          <X className="h-3.5 w-3.5" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClearSelection}
+          disabled={isBusy}
+          className="gap-1"
+        >
+          <X className="size-3.5" />
           Clear
         </Button>
       </div>
@@ -54,7 +61,11 @@ export function EmailBulkActions({
           onClick={onDeleteSelected}
           disabled={isDeleting}
         >
-          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          {isDeleting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Trash2 className="size-3.5" />
+          )}
           Delete
         </Button>
 
@@ -67,7 +78,7 @@ export function EmailBulkActions({
           onClick={onMarkRead}
           disabled={isMarking}
         >
-          <MailOpen className="h-3.5 w-3.5" />
+          <MailOpen className="size-3.5" />
           Mark read
         </Button>
         <Button
@@ -77,7 +88,7 @@ export function EmailBulkActions({
           onClick={onMarkUnread}
           disabled={isMarking}
         >
-          <MailX className="h-3.5 w-3.5" />
+          <MailX className="size-3.5" />
           Mark unread
         </Button>
 
@@ -90,7 +101,7 @@ export function EmailBulkActions({
           onClick={onStarSelected}
           disabled={isStarring}
         >
-          <Star className="h-3.5 w-3.5" />
+          <Star className="size-3.5" />
           Star
         </Button>
         <Button
@@ -100,7 +111,7 @@ export function EmailBulkActions({
           onClick={onUnstarSelected}
           disabled={isStarring}
         >
-          <StarOff className="h-3.5 w-3.5" />
+          <StarOff className="size-3.5" />
           Unstar
         </Button>
       </div>

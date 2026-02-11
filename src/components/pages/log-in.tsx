@@ -1,4 +1,10 @@
-import { Button } from "@components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "@tanstack/react-router";
+import { Loader2, Lock, Mail } from "lucide-react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,7 +12,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@components/ui/card";
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -14,18 +20,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Link } from "@tanstack/react-router";
-import { Loader2, Lock, Mail } from "lucide-react";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/form";
 import { GoogleButton } from "@/components/ui/google-button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ENABLE_GOOGLE_AUTH } from "@/lib/consts";
-import { useSignIn } from "@/hooks/react-query/useAuth";
+import { ENABLE_GOOGLE_AUTH } from "@/config/env";
+import { useSignIn } from "@/hooks/react-query/use-auth";
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -34,7 +34,7 @@ const formSchema = z.object({
 
 type FormInputs = z.infer<typeof formSchema>;
 
-export default function LogInPage() {
+export function LogInPage() {
   const form = useForm<FormInputs>({
     defaultValues: {
       email: "",
@@ -51,8 +51,8 @@ export default function LogInPage() {
   return (
     <Card className="w-full border border-slate-200 shadow-lg">
       <CardHeader className="space-y-2 text-center">
-        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Mail className="h-6 w-6 text-primary" />
+        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
+          <Mail className="size-6 text-primary" />
         </div>
         <CardTitle className="text-2xl font-bold text-slate-900">Welcome</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">

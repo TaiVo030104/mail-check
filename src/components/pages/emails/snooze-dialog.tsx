@@ -30,22 +30,18 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
 
-  // Dynamic labels based on current time
   const getSnoozePresets = () => {
     const now = new Date();
     const currentHour = now.getHours();
-    const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+    const currentDay = now.getDay();
 
-    // Calculate "Later today" or "Tomorrow morning"
     const laterTodayLabel = currentHour < 15 ? "Later today (6 PM)" : "Tomorrow morning (9 AM)";
 
-    // Calculate weekend label
     let weekendLabel = "This weekend (Sat 9 AM)";
     if (currentDay === 6 || currentDay === 0 || (currentDay === 5 && currentHour >= 15)) {
       weekendLabel = "Next weekend (Sat 9 AM)";
     }
 
-    // Calculate next Monday date
     const nextMonday = new Date(now);
     const daysUntilNextMonday = (8 - now.getDay()) % 7 || 7;
     nextMonday.setDate(nextMonday.getDate() + daysUntilNextMonday);
@@ -81,7 +77,6 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
     try {
       await emailService.snoozeEmailWithPreset(emailId, preset);
 
-      // Wait for queries to be invalidated
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["kanban"] }),
         queryClient.invalidateQueries({ queryKey: ["emails"] }),
@@ -108,12 +103,10 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
 
     setIsLoading(true);
     try {
-      // Combine date and time
       const [hours, minutes] = selectedTime.split(":").map(Number);
       const snoozeDate = new Date(selectedDate);
       snoozeDate.setHours(hours, minutes, 0, 0);
 
-      // Check if date is in the future
       if (snoozeDate <= new Date()) {
         toast.error("Snooze time must be in the future");
         return;
@@ -121,7 +114,6 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
 
       await emailService.snoozeEmail(emailId, snoozeDate.toISOString());
 
-      // Wait for queries to be invalidated
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["kanban"] }),
         queryClient.invalidateQueries({ queryKey: ["emails"] }),
@@ -152,7 +144,7 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Preset options */}
+          {}
           <div className="space-y-2">
             <Label>Quick options</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -181,7 +173,7 @@ export function SnoozeDialog({ emailId, open, onOpenChange, onSuccess }: SnoozeD
             </div>
           </div>
 
-          {/* Custom date/time picker */}
+          {}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="custom-date" className="flex items-center gap-2">

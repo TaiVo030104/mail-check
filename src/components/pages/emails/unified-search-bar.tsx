@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Email } from "@/services/email";
-import { SearchResult, searchService } from "@/services/search";
+import { searchService } from "@/services/search";
+import type { Email } from "@/types/email";
+import type { SearchResult } from "@/types/search";
 
 interface UnifiedSearchBarProps {
   onResultsChange: (emails: Email[], isSearching: boolean) => void;
@@ -41,13 +42,11 @@ export function UnifiedSearchBar({
   const { toast } = useToast();
   const [semanticErrorShown, setSemanticErrorShown] = useState(false);
 
-  // Use ref to avoid re-triggering effect when callback changes
   const onResultsChangeRef = useRef(onResultsChange);
   useEffect(() => {
     onResultsChangeRef.current = onResultsChange;
   }, [onResultsChange]);
 
-  // Fetch auto-suggestions when typing (always show with search results)
   useEffect(() => {
     if (query.length >= 2) {
       setIsLoadingSuggestions(true);
@@ -58,14 +57,13 @@ export function UnifiedSearchBar({
       ])
         .then(([contacts, keywords]) => {
           const allSuggestions = [
-            { text: query, type: "original" as const }, // Add original query as first item
+            { text: query, type: "original" as const },
             ...contacts.map((c) => ({ text: c, type: "contact" as const })),
             ...keywords.map((k) => ({ text: k, type: "keyword" as const })),
           ];
-          setSuggestions(allSuggestions.slice(0, 5)); // Original + 4 suggestions
+          setSuggestions(allSuggestions.slice(0, 5));
         })
-        .catch((error) => {
-          console.error("Error fetching suggestions:", error);
+        .catch(() => {
           setSuggestions([{ text: query, type: "original" as const }]);
         })
         .finally(() => {
@@ -76,19 +74,17 @@ export function UnifiedSearchBar({
     }
   }, [query]);
 
-  // Fetch search results and update main list
   useEffect(() => {
     if (debouncedQuery.length >= 2) {
       setIsLoading(true);
       setShowSuggestions(false);
 
       searchService
-        .search(debouncedQuery, folder, 50, true) // includeSemantic = true
+        .search(debouncedQuery, folder, 50, true)
         .then((response) => {
           const results = response.results || [];
           setSearchResults(results);
 
-          // Check for semantic search errors
           if (response.metadata?.semanticSearchError && !semanticErrorShown) {
             toast({
               title: "Semantic search unavailable",
@@ -101,12 +97,10 @@ export function UnifiedSearchBar({
             setSemanticErrorShown(false);
           }
 
-          // Update main list real-time with sorted emails (by relevanceScore)
           const emails = results.map((r) => r.email);
           onResultsChangeRef.current(emails, true);
         })
-        .catch((error) => {
-          console.error("Error fetching search results:", error);
+        .catch(() => {
           setSearchResults([]);
           onResultsChangeRef.current([], false);
         })
@@ -115,12 +109,10 @@ export function UnifiedSearchBar({
         });
     } else {
       setSearchResults([]);
-      onResultsChangeRef.current([], false); // Reset to normal folder view
+      onResultsChangeRef.current([], false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, folder]);
 
-  // Show dropdown when query is long enough
   useEffect(() => {
     if (query.length >= 2) {
       setShowDropdown(true);
@@ -131,7 +123,6 @@ export function UnifiedSearchBar({
     }
   }, [query]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -178,7 +169,6 @@ export function UnifiedSearchBar({
 
     if (!showDropdown || totalItems === 0) {
       if (e.key === "Enter" && query.trim()) {
-        // Enter pressed - stop loading, keep showing results in main view, close dropdown
         e.preventDefault();
         setIsLoading(false);
         setShowDropdown(false);
@@ -199,14 +189,11 @@ export function UnifiedSearchBar({
         e.preventDefault();
         if (selectedIndex >= 0) {
           if (selectedIndex < suggestionCount) {
-            // Select suggestion - fill and trigger search
             handleSelectSuggestion(suggestions[selectedIndex]);
           } else if (selectedIndex - suggestionCount < resultCount) {
-            // Select email result
             handleSelectEmail(searchResults[selectedIndex - suggestionCount]);
           }
         } else {
-          // No selection, just close dropdown and show all results in main view
           setShowDropdown(false);
         }
         break;
@@ -222,11 +209,10 @@ export function UnifiedSearchBar({
     setSearchResults([]);
     setSuggestions([]);
     setShowDropdown(false);
-    onResultsChangeRef.current([], false); // Reset to folder view
+    onResultsChangeRef.current([], false);
     inputRef.current?.focus();
   };
 
-  // Scroll selected item into view
   useEffect(() => {
     if (selectedIndex >= 0 && dropdownRef.current) {
       const selectedElement = dropdownRef.current.children[selectedIndex] as HTMLElement;
@@ -236,7 +222,7 @@ export function UnifiedSearchBar({
     }
   }, [selectedIndex]);
 
-  const topResults = searchResults.slice(0, 10); // Show top 10 in dropdown
+  const topResults = searchResults.slice(0, 10);
 
   return (
     <div ref={containerRef} className={cn("relative flex-1", className)}>
@@ -275,22 +261,22 @@ export function UnifiedSearchBar({
         </div>
       </div>
 
-      {/* Dropdown with suggestions and results */}
+      {}
       {showDropdown && query.length >= 2 && (
         <div
           ref={dropdownRef}
           className="absolute z-[100] mt-1 max-h-[500px] w-full overflow-hidden rounded-md border bg-popover shadow-lg"
           role="listbox"
         >
-          {/* Unified scroll container for both sections */}
+          {}
           <div className="max-h-[450px] overflow-auto">
-            {/* Auto-Suggestion Section - Always show above results */}
+            {}
             {suggestions.length > 0 && (
               <div className="border-b">
                 <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 dark:from-blue-950/50 dark:to-purple-950/50">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                      <Lightbulb className="h-3 w-3" /> Type-ahead Suggestions
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      <Lightbulb className="size-3" /> Type-ahead Suggestions
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       (Use ↑↓ arrows, press Enter to select)
@@ -349,11 +335,11 @@ export function UnifiedSearchBar({
               </div>
             )}
 
-            {/* Search Results Section */}
+            {}
             {query.length >= 2 && (
               <div>
-                <div className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                  <Mail className="h-3 w-3" /> Top Results (sorted by relevance)
+                <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground">
+                  <Mail className="size-3" /> Top Results (sorted by relevance)
                 </div>
                 {isLoading && topResults.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
@@ -422,7 +408,7 @@ export function UnifiedSearchBar({
             )}
           </div>
 
-          {/* Footer */}
+          {}
           {!showSuggestions && searchResults.length > 0 && (
             <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
