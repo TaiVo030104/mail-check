@@ -1,0 +1,731 @@
+---
+# =============================================================================
+# Universal Deployment Playbook
+# Supports: Production, Development, and Preview environments
+# Can run on same server or different servers
+# =============================================================================
+- name: Deploy Mail Application
+  hosts: all
+  become: true
+  vars:
+    app_root: "/opt/{{ app_name }}"
+    backend_dir: "{{ app_root }}/backend"
+    frontend_dir: "{{ app_root }}/frontend"
+    
+    # Port assignment based on environment
+    backend_port_map:
+      prod: 5000
+      dev: 5001
+      preview_base: 5100  # Preview will use 5100, 5101, 5102...
+    
+    frontend_port_map:
+      prod: 3000
+      dev: 3001
+      preview_base: 3100  # Preview will use 3100, 3101, 3102...
+
+  tasks:
+    # ==========================================================================
+    # 0. FACTS GATHERING & SETUP
+    # ==========================================================================
+    - name: Set environment type
+      set_fact:
+        is_prod: "{{ app_name == 'prod' }}"
+        is_dev: "{{ app_name == 'dev' }}"
+        is_preview: "{{ app_name.startswith('preview-') }}"
+      tags: [always]
+
+    - name: Determine domain name
+      set_fact:
+        full_domain: "{{ domain_name if domain_name is defined else (app_name + '.mail-dev.nguyenanhhao.site' if is_preview else 'mail-dev.nguyenanhhao.site' if is_dev else 'mail.nguyenanhhao.site') }}"
+      tags: [always]
+
+    - name: Get list of existing preview deployments
+      shell: ls -d /opt/preview-* 2>/dev/null | xargs -n1 basename || echo ""
+      register: existing_previews
+      changed_when: false
+      tags: [always]
+
+    - name: Parse existing previews
+      set_fact:
+        preview_list: "{{ existing_previews.stdout_lines | select('match', '^preview-.*') | list }}"
+      tags: [always]
+
+    - name: Calculate preview index for port assignment
+      set_fact:
+        preview_index: "{{ preview_list.index(app_name) if app_name in preview_list else (preview_list | length) }}"
+      when: is_preview
+      tags: [always]
+
+    - name: Assign ports
+      set_fact:
+        backend_port: "{{ backend_port_map.prod if is_prod else (backend_port_map.dev if is_dev else (backend_port_map.preview_base | int + (preview_index | int))) }}"
+        frontend_port: "{{ frontend_port_map.prod if is_prod else (frontend_port_map.dev if is_dev else (frontend_port_map.preview_base | int + (preview_index | int))) }}"
+      tags: [always]
+
+    - name: Display deployment info
+      debug:
+        msg:
+          - "Environment: {{ 'Production' if is_prod else 'Development' if is_dev else 'Preview' }}"
+          - "App Name: {{ app_name }}"
+          - "Domain: {{ full_domain }}"
+          - "Backend Port: {{ backend_port }}"
+          - "Frontend Port: {{ frontend_port }}"
+          - "MongoDB: {{ mongo_uri | regex_replace('@.*', '@***') }}"
+      tags: [always]
+
+    # ==========================================================================
+    # 1. SYSTEM SETUP (Only on first run)
+    # ==========================================================================
+    - name: Check if Docker is installed
+      command: which docker
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+      tags: [setup]
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: docker_check.rc != 0
+      tags: [setup]
+
+    - name: Wait for apt locks
+      shell: |
+        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          sleep 3
+        done
+      when: docker_check.rc != 0
+      tags: [setup]
+
+    - name: Install system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - git
+          - ufw
+          - certbot
+          - python3-pip
+          - python3-docker
+          - nginx
+        state: present
+      when: docker_check.rc != 0
+      tags: [setup]
+
+    - name: Install Docker
+      shell: |
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh
+        rm get-docker.sh
+      args:
+        creates: /usr/bin/docker
+      when: docker_check.rc != 0
+      tags: [setup]
+
+    - name: Install Docker Compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+      when: docker_check.rc != 0
+      tags: [setup]
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      tags: [setup]
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+      tags: [setup]
+
+    - name: Reset SSH connection for docker group to take effect
+      meta: reset_connection
+      tags: [setup]
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22"
+        - "80"
+        - "443"
+      tags: [setup]
+
+    - name: Enable firewall
+      ufw:
+        state: enabled
+      tags: [setup]
+
+    - name: Ensure Nginx is started
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+      tags: [setup]
+
+    # ==========================================================================
+    # 2. PREVIEW ENVIRONMENT CLEANUP (Max 2 previews)
+    # ==========================================================================
+    - name: Identify old previews to remove
+      set_fact:
+        previews_to_remove: "{{ (preview_list | difference([app_name]) | sort)[:-1] }}"
+      when: is_preview and (preview_list | length) >= 2
+      tags: [cleanup, deploy]
+
+    - name: Stop and remove old preview containers
+      shell: |
+        cd /opt/{{ item }} 2>/dev/null || exit 0
+        docker compose -p {{ item }} down --remove-orphans 2>/dev/null || true
+      loop: "{{ previews_to_remove | default([]) }}"
+      when: is_preview and previews_to_remove is defined
+      ignore_errors: true
+      tags: [cleanup, deploy]
+
+    - name: Remove old preview directories
+      file:
+        path: "/opt/{{ item }}"
+        state: absent
+      loop: "{{ previews_to_remove | default([]) }}"
+      when: is_preview and previews_to_remove is defined
+      tags: [cleanup, deploy]
+
+    - name: Remove old preview Nginx configs
+      file:
+        path: "/etc/nginx/sites-enabled/{{ item }}.conf"
+        state: absent
+      loop: "{{ previews_to_remove | default([]) }}"
+      when: is_preview and previews_to_remove is defined
+      notify: Reload Nginx
+      tags: [cleanup, deploy]
+
+    # ==========================================================================
+    # 3. GIT AUTHENTICATION
+    # ==========================================================================
+    - name: Configure Git credentials
+      shell: |
+        git config --global credential.helper store
+        echo "https://{{ github_user }}:{{ github_token }}@github.com" > ~/.git-credentials
+      when: github_user is defined and github_token is defined
+      tags: [always]
+
+    # ==========================================================================
+    # 4. APPLICATION DEPLOYMENT
+    # ==========================================================================
+    - name: Create application directories
+      file:
+        path: "{{ app_root }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [deploy]
+
+    - name: Create docker-compose.yml
+      copy:
+        dest: "{{ app_root }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+        content: |
+          version: '3.8'
+          
+          services:
+            backend:
+              image: ghcr.io/awad-final-project/backend:{{ backend_branch }}
+              container_name: {{ app_name }}-backend
+              restart: unless-stopped
+              ports:
+                - "127.0.0.1:{{ backend_port }}:{{ backend_port }}"
+              environment:
+                - NODE_ENV={{ 'production' if is_prod else 'development' }}
+                - PORT={{ backend_port }}
+                - "MONGO_URI={{ mongo_uri }}"
+                - MONGO_DB={{ mongo_db | default('user_registration') }}
+                - "JWT_SECRET={{ jwt_secret }}"
+                - JWT_EXPIRES_IN={{ jwt_expires_in | default('7d') }}
+                - "JWT_REFRESH_SECRET={{ jwt_refresh_secret }}"
+                - JWT_REFRESH_EXPIRES_IN={{ jwt_refresh_expires_in | default('30d') }}
+                - GOOGLE_CLIENT_ID={{ google_client_id }}
+                - GOOGLE_CLIENT_SECRET={{ google_client_secret }}
+                - GOOGLE_CALLBACK_URL=https://{{ full_domain }}/api/auth/google/callback
+                - FRONTEND_URL=https://{{ full_domain }}
+                - GEMINI_API_KEY={{ gemini_api_key | default('') }}
+                - MAIL_HOST={{ mail_host | default('smtp.gmail.com') }}
+                - MAIL_PORT={{ mail_port | default('587') }}
+                - MAIL_SECURE={{ mail_secure | default('false') }}
+                - MAIL_USER={{ mail_user | default('') }}
+                - MAIL_PASSWORD={{ mail_password | default('') }}
+                - "MAIL_FROM={{ mail_from | default('System <noreply@system.com>') }}"
+                - APP_NAME={{ app_name }}
+                - DOMAIN={{ full_domain }}
+              networks:
+                - {{ app_name }}-network
+              healthcheck:
+                test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:{{ backend_port }}/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+          
+            frontend:
+              image: ghcr.io/awad-final-project/frontend:{{ frontend_branch }}
+              container_name: {{ app_name }}-frontend
+              restart: unless-stopped
+              ports:
+                - "127.0.0.1:{{ frontend_port }}:80"
+              environment:
+                - VITE_API_URL=https://{{ full_domain }}/api
+                - VITE_API_BASE_URL=https://{{ full_domain }}/api
+                - VITE_USE_COOKIE_AUTH=false
+                - VITE_ENABLE_GOOGLE_AUTH=true
+                - VITE_ENABLE_GPT5_1_CODEX_MAX=true
+                - VITE_APP_NAME={{ app_name }}
+                - VITE_ENVIRONMENT={{ 'production' if is_prod else 'development' }}
+              networks:
+                - {{ app_name }}-network
+              depends_on:
+                - backend
+          
+            dozzle:
+              image: amir20/dozzle:latest
+              container_name: {{ app_name }}-dozzle
+              restart: unless-stopped
+              ports:
+                - "127.0.0.1:8080:8080"
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock:ro
+              environment:
+                - DOZZLE_LEVEL=info
+                - DOZZLE_TAILSIZE=300
+                - DOZZLE_FILTER=name={{ app_name }}-.*
+              networks:
+                - {{ app_name }}-network
+          
+          networks:
+            {{ app_name }}-network:
+              driver: bridge
+      tags: [deploy, config]
+
+    # ==========================================================================
+    # 5. DOCKER DEPLOYMENT
+    # ==========================================================================
+    - name: Login to GitHub Container Registry
+      community.docker.docker_login:
+        registry: ghcr.io
+        username: "{{ github_user }}"
+        password: "{{ github_token }}"
+        reauthorize: yes
+      when: github_user is defined and github_token is defined
+      tags: [deploy]
+
+    - name: Prune unused Docker data (images, containers, networks)
+      shell: docker system prune -af
+      tags: [cleanup]
+
+    - name: Prune unused Docker volumes
+      shell: docker volume prune -f
+      tags: [cleanup]
+
+    - name: Pull Docker images
+      shell: docker compose pull
+      args:
+        chdir: "{{ app_root }}"
+      tags: [deploy]
+
+    - name: Stop existing containers
+      shell: docker compose -p {{ app_name }} down --remove-orphans
+      args:
+        chdir: "{{ app_root }}"
+      ignore_errors: true
+      tags: [deploy]
+
+    - name: Start application containers
+      shell: docker compose -p {{ app_name }} up -d
+      args:
+        chdir: "{{ app_root }}"
+      tags: [deploy]
+
+    - name: Wait for containers to be healthy
+      pause:
+        seconds: 10
+      tags: [deploy]
+
+    # ==========================================================================
+    # 6. NGINX CONFIGURATION (HTTP ONLY - For SSL Challenge)
+    # ==========================================================================
+    - name: Create temporary HTTP-only Nginx config for SSL challenge
+      copy:
+        dest: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        mode: '0644'
+        content: |
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ full_domain }};
+          
+              # Certbot webroot for SSL challenges
+              location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+                  allow all;
+              }
+          
+              # Temporary proxy to frontend (for testing)
+              location / {
+                  proxy_pass http://127.0.0.1:{{ frontend_port }};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          
+              # API Backend proxy
+              location /api/ {
+                  proxy_pass http://127.0.0.1:{{ backend_port }}/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+      tags: [nginx, ssl]
+
+    - name: Enable Nginx site (temporary)
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}.conf"
+        state: link
+      tags: [nginx, ssl]
+
+    - name: Test Nginx configuration (before SSL)
+      command: nginx -t
+      register: nginx_test_pre
+      changed_when: false
+      tags: [nginx, ssl]
+
+    - name: Reload Nginx (before SSL)
+      systemd:
+        name: nginx
+        state: reloaded
+      tags: [nginx, ssl]
+
+    # ==========================================================================
+    # 7. SSL CERTIFICATE
+    # ==========================================================================
+    - name: Check if SSL certificate exists
+      stat:
+        path: "/etc/letsencrypt/live/{{ full_domain }}/fullchain.pem"
+      register: ssl_cert
+      tags: [ssl]
+
+    - name: Create certbot webroot
+      file:
+        path: /var/www/certbot
+        state: directory
+        mode: '0755'
+      tags: [ssl]
+
+    - name: Obtain SSL certificate for main domain
+      shell: |
+        certbot certonly --webroot \
+          -w /var/www/certbot \
+          -d {{ full_domain }} \
+          --email {{ ssl_email }} \
+          --agree-tos \
+          --non-interactive
+      when: not ssl_cert.stat.exists
+      tags: [ssl]
+
+    # ==========================================================================
+    # 7.5 DOZZLE SSL CERTIFICATE
+    # ==========================================================================
+    - name: Set Dozzle domain
+      set_fact:
+        dozzle_domain: "dozzle.{{ full_domain }}"
+      tags: [ssl, dozzle]
+
+    - name: Check if Dozzle SSL certificate exists
+      stat:
+        path: "/etc/letsencrypt/live/{{ full_domain }}/fullchain.pem"
+      register: dozzle_ssl_cert
+      tags: [ssl, dozzle]
+
+    - name: Obtain SSL certificate for Dozzle subdomain (if needed)
+      shell: |
+        certbot certonly --webroot \
+          -w /var/www/certbot \
+          -d {{ dozzle_domain }} \
+          --email {{ ssl_email }} \
+          --agree-tos \
+          --non-interactive \
+          --expand
+      when: not dozzle_ssl_cert.stat.exists
+      ignore_errors: true
+      tags: [ssl, dozzle]
+
+    # ==========================================================================
+    # 8. NGINX CONFIGURATION (FULL WITH SSL)
+    # ==========================================================================
+    - name: Create full Nginx site config with SSL
+      copy:
+        dest: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        mode: '0644'
+        content: |
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ full_domain }};
+          
+              # Certbot webroot for SSL challenges
+              location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+              }
+          
+              location / {
+                  return 301 https://$server_name$request_uri;
+              }
+          }
+          
+          server {
+              listen 443 ssl http2;
+              listen [::]:443 ssl http2;
+              server_name {{ full_domain }};
+          
+              # SSL Configuration
+              ssl_certificate /etc/letsencrypt/live/{{ full_domain }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ full_domain }}/privkey.pem;
+              ssl_protocols TLSv1.2 TLSv1.3;
+              ssl_ciphers HIGH:!aNULL:!MD5;
+          
+              # Security headers
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+          
+              # API Backend proxy
+              location /api/ {
+                  proxy_pass http://127.0.0.1:{{ backend_port }}/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_cache_bypass $http_upgrade;
+                  proxy_read_timeout 300s;
+                  proxy_connect_timeout 75s;
+              }
+          
+              # Frontend proxy
+              location / {
+                  proxy_pass http://127.0.0.1:{{ frontend_port }};
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_cache_bypass $http_upgrade;
+              }
+          }
+      notify: Reload Nginx
+      tags: [nginx, config]
+
+    - name: Enable Nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}.conf"
+        state: link
+      notify: Reload Nginx
+      tags: [nginx, config]
+
+    - name: Test Nginx configuration (with SSL)
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+      tags: [nginx, config]
+
+    - name: Force Nginx reload (with SSL)
+      systemd:
+        name: nginx
+        state: reloaded
+      tags: [nginx, config]
+
+    # ==========================================================================
+    # 8.5 DOZZLE NGINX CONFIGURATION
+    # ==========================================================================
+    - name: Create Dozzle Nginx config
+      copy:
+        dest: "/etc/nginx/sites-available/{{ app_name }}-dozzle.conf"
+        mode: '0644'
+        content: |
+          # HTTP Server - Redirect to HTTPS
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ dozzle_domain }};
+          
+              # Certbot webroot for SSL challenges
+              location /.well-known/acme-challenge/ {
+                  root /var/www/certbot;
+              }
+          
+              location / {
+                  return 301 https://$server_name$request_uri;
+              }
+          }
+          
+          # HTTPS Server
+          server {
+              listen 443 ssl http2;
+              listen [::]:443 ssl http2;
+              server_name {{ dozzle_domain }};
+          
+              # SSL Configuration (use wildcard or main cert)
+              ssl_certificate /etc/letsencrypt/live/{{ full_domain }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ full_domain }}/privkey.pem;
+              ssl_protocols TLSv1.2 TLSv1.3;
+              ssl_ciphers HIGH:!aNULL:!MD5;
+          
+              # Security headers
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+          
+              # Dozzle proxy
+              location / {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_http_version 1.1;
+                  
+                  # WebSocket support for real-time logs
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  
+                  # Timeouts for long-running log streams
+                  proxy_connect_timeout 300s;
+                  proxy_send_timeout 300s;
+                  proxy_read_timeout 300s;
+                  
+                  # Buffer settings for streaming
+                  proxy_buffering off;
+                  proxy_request_buffering off;
+              }
+          }
+      notify: Reload Nginx
+      tags: [nginx, config, dozzle]
+
+    - name: Enable Dozzle Nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}-dozzle.conf"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}-dozzle.conf"
+        state: link
+      notify: Reload Nginx
+      tags: [nginx, config, dozzle]
+
+    - name: Test Nginx configuration (with Dozzle)
+      command: nginx -t
+      register: nginx_test_dozzle
+      changed_when: false
+      tags: [nginx, config, dozzle]
+
+    - name: Force Nginx reload (with Dozzle)
+      systemd:
+        name: nginx
+        state: reloaded
+      tags: [nginx, config, dozzle]
+
+    # ==========================================================================
+    # 9. VERIFICATION
+    # ==========================================================================
+    - name: Check container status
+      shell: docker compose -p {{ app_name }} ps
+      args:
+        chdir: "{{ app_root }}"
+      register: container_status
+      changed_when: false
+      tags: [verify]
+
+    - name: Display container status
+      debug:
+        var: container_status.stdout_lines
+      tags: [verify]
+
+    - name: Check backend health
+      uri:
+        url: "http://127.0.0.1:{{ backend_port }}/health"
+        method: GET
+      register: backend_health
+      retries: 5
+      delay: 5
+      until: backend_health.status == 200
+      ignore_errors: true
+      tags: [verify]
+
+    - name: Get backend container logs (if unhealthy)
+      shell: docker logs {{ app_name }}-backend --tail 100 2>&1
+      register: backend_logs
+      when: backend_health is failed or backend_health.status != 200
+      changed_when: false
+      tags: [verify]
+
+    - name: Display backend logs (if unhealthy)
+      debug:
+        msg: "{{ backend_logs.stdout_lines }}"
+      when: backend_health is failed or backend_health.status != 200
+      tags: [verify]
+
+    - name: Inspect backend container (if unhealthy)
+      shell: docker inspect {{ app_name }}-backend --format='{{ '{{' }}json .State{{ '}}' }}'
+      register: backend_inspect
+      when: backend_health is failed or backend_health.status != 200
+      changed_when: false
+      tags: [verify]
+
+    - name: Display backend container state (if unhealthy)
+      debug:
+        msg: "{{ backend_inspect.stdout | from_json }}"
+      when: backend_health is failed or backend_health.status != 200
+      tags: [verify]
+
+    - name: Get frontend container logs
+      shell: docker logs {{ app_name }}-frontend --tail 50
+      register: frontend_logs
+      changed_when: false
+      tags: [verify]
+
+    - name: Display frontend logs
+      debug:
+        msg: "{{ frontend_logs.stdout_lines }}"
+      tags: [verify]
+
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "==================================================================="
+          - "Deployment completed successfully!"
+          - "Environment: {{ app_name }}"
+          - "Domain: https://{{ full_domain }}"
+          - "Backend: http://127.0.0.1:{{ backend_port }}"
+          - "Frontend: http://127.0.0.1:{{ frontend_port }}"
+          - "Dozzle Logs: https://{{ dozzle_domain }}"
+          - "==================================================================="
+      tags: [always]
+
+  handlers:
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded

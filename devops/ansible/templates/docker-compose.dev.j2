@@ -1,0 +1,55 @@
+services:
+  backend-dev:
+    image: ghcr.io/awad-final-project/backend:{{ final_backend_branch | default(branch) }}
+    container_name: {{ app_name }}-backend
+    restart: unless-stopped
+    env_file:
+      - {{ app_root }}/backend/.env.dev
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    networks:
+      - default
+      - web
+
+  frontend-dev:
+    image: ghcr.io/awad-final-project/frontend:{{ final_frontend_branch | default('dev') }}
+    container_name: {{ app_name }}-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=https://{{ final_domain_name | default(domain_name) }}/api
+      - VITE_USE_COOKIE_AUTH=false
+      - VITE_ENABLE_GOOGLE_AUTH=true
+      - VITE_ENABLE_GPT5_1_CODEX_MAX=true
+    depends_on:
+      - backend-dev
+    networks:
+      - default
+      - web
+
+{% if app_name == 'dev' %}
+  nginx:
+    image: nginx:alpine
+    container_name: {{ app_name }}-nginx
+    restart: unless-stopped
+    volumes:
+      - {{ devops_dir }}/config/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - {{ devops_dir }}/config/nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend-dev
+      - frontend-dev
+    networks:
+      - default
+      - web
+{% endif %}
+
+networks:
+  web:
+    external: true
+  default:
+    name: {{ app_name }}-network

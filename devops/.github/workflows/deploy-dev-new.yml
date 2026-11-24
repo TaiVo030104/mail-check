@@ -1,0 +1,101 @@
+name: Deploy Development
+
+on:
+  repository_dispatch:
+    types: [deploy-dev]
+  workflow_dispatch:
+    inputs:
+      backend_branch:
+        description: 'Backend branch/tag'
+        required: false
+        default: 'dev'
+      frontend_branch:
+        description: 'Frontend branch/tag'
+        required: false
+        default: 'dev'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout DevOps Repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEV_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Extract branch names from payload
+        id: branches
+        run: |
+          BACKEND_BRANCH="${{ github.event.client_payload.branch_backend || github.event.inputs.backend_branch || 'dev' }}"
+          FRONTEND_BRANCH="${{ github.event.client_payload.branch_frontend || github.event.inputs.frontend_branch || 'dev' }}"
+          echo "backend_branch=$BACKEND_BRANCH" >> $GITHUB_OUTPUT
+          echo "frontend_branch=$FRONTEND_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Create Dynamic Inventory
+        run: |
+          cd ansible
+          cat > inventory-dev.ini << EOF
+          [development]
+          dev_server ansible_host=${{ secrets.DEV_SERVER_IP }} ansible_user=ubuntu
+          
+          [development:vars]
+          ansible_ssh_private_key_file=~/.ssh/id_rsa
+          ansible_python_interpreter=/usr/bin/python3
+          
+          # App Configuration
+          app_name=dev
+          domain_name=mail-dev.nguyenanhhao.site
+          backend_branch=${{ steps.branches.outputs.backend_branch }}
+          frontend_branch=${{ steps.branches.outputs.frontend_branch }}
+          
+          # Repositories
+          backend_repo=https://github.com/awad-final-project/backend.git
+          frontend_repo=https://github.com/awad-final-project/frontend.git
+          
+          # GitHub
+          github_user=awad-final-project
+          github_token=${{ secrets.GHCR_TOKEN }}
+          
+          # MongoDB Atlas
+          mongo_uri=${{ secrets.DEV_MONGO_URI }}
+          mongo_db=user_registration
+          
+          # JWT
+          jwt_secret=${{ secrets.JWT_SECRET }}
+          jwt_expires_in=7d
+          jwt_refresh_secret=${{ secrets.JWT_REFRESH_SECRET }}
+          jwt_refresh_expires_in=30d
+          
+          # Google OAuth
+          google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}
+          google_client_secret=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          
+          # Google Gemini AI
+          gemini_api_key=${{ secrets.GEMINI_API_KEY }}
+          
+          # SSL
+          ssl_email=${{ secrets.SSL_EMAIL || 'anhhao012004@gmail.com' }}
+          EOF
+
+      - name: Deploy Development Environment
+        run: |
+          cd ansible
+          ansible-playbook -i inventory-dev.ini deploy.yml
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "✅ Development deployment completed!"
+          echo "🌐 URL: https://mail-dev.nguyenanhhao.site"
+          echo "📦 Backend: ${{ steps.branches.outputs.backend_branch }}"
+          echo "📦 Frontend: ${{ steps.branches.outputs.frontend_branch }}"
