@@ -21,10 +21,15 @@ và kết nối IMAP dài. **Giữ đúng 1 replica**, nếu scale lên N thì m
 
 ## 2. Backend trên Railway
 
-1. New Project → Deploy from GitHub repo → `awad-final-project/backend`, branch `main`.
+1. New Project → Deploy from GitHub repo → `TaiVo030104/mail-check`, branch `main`.
+2. Service → Settings (vì đây là monorepo):
+   - **Source → Root Directory**: `/backend`
+   - **Config-as-code → Railway Config File**: `/backend/railway.json` (file config không tự theo Root Directory)
+   - **Source → Watch Paths**: `/backend/**` (chỉ redeploy khi backend thay đổi)
+
    Railway đọc `railway.json`: build bằng `Dockerfile`, healthcheck `/health`, 1 replica.
-2. Settings → Networking → **Generate Domain** (ví dụ `mailcheck-api.up.railway.app`).
-3. Variables (Railway tự set `PORT`, không cần thêm):
+3. Settings → Networking → **Generate Domain** (ví dụ `mailcheck-api.up.railway.app`).
+4. Variables (Railway tự set `PORT`, không cần thêm):
 
 | Biến | Giá trị |
 |---|---|
@@ -44,11 +49,11 @@ và kết nối IMAP dài. **Giữ đúng 1 replica**, nếu scale lên N thì m
 | `GEMINI_API_KEY` | tuỳ chọn, nếu thiếu thì tắt tính năng AI |
 | `GMAIL_PUBSUB_TOPIC` | tuỳ chọn (Gmail push notifications) |
 
-4. Kiểm tra: `curl https://<backend>.up.railway.app/health`
+5. Kiểm tra: `curl https://<backend>.up.railway.app/health`
 
 ## 3. Frontend trên Vercel
 
-1. Add New Project → import `awad-final-project/frontend`. `vercel.json` đã cấu hình sẵn
+1. Add New Project → import `TaiVo030104/mail-check`, **Root Directory: `frontend`**. `frontend/vercel.json` đã cấu hình sẵn
    framework Vite, pnpm, SPA rewrite và cache header cho `sw.js`.
 2. Environment Variables (Vite nhúng các biến này lúc build, nên **phải redeploy sau khi đổi**):
 
