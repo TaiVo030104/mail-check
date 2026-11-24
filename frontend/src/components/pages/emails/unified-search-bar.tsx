@@ -1,0 +1,430 @@
+import { format } from "date-fns";
+import { Calendar, Hash, Lightbulb, Loader2, Mail, Paperclip, Search, User, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useDebounce } from "use-debounce";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { searchService } from "@/services/search";
+import type { Email } from "@/types/email";
+import type { SearchResult } from "@/types/search";
+
+interface UnifiedSearchBarProps {
+  onResultsChange: (emails: Email[], isSearching: boolean) => void;
+  onEmailSelect: (email: Email) => void;
+  folder: string;
+  className?: string;
+}
+
+export function UnifiedSearchBar({
+  onResultsChange,
+  onEmailSelect,
+  folder,
+  className,
+}: UnifiedSearchBarProps) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery] = useDebounce(query, 300);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<
+    { text: string; type: "contact" | "keyword" | "original" }[]
+  >([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const [semanticErrorShown, setSemanticErrorShown] = useState(false);
+
+  const onResultsChangeRef = useRef(onResultsChange);
+  useEffect(() => {
+    onResultsChangeRef.current = onResultsChange;
+  }, [onResultsChange]);
+
+  useEffect(() => {
+    if (query.length >= 2) {
+      setIsLoadingSuggestions(true);
+
+      Promise.all([
+        searchService.getContactSuggestions(query, 3),
+        searchService.getKeywordSuggestions(query, 3),
+      ])
+        .then(([contacts, keywords]) => {
+          const allSuggestions = [
+            { text: query, type: "original" as const },
+            ...contacts.map((c) => ({ text: c, type: "contact" as const })),
+            ...keywords.map((k) => ({ text: k, type: "keyword" as const })),
+          ];
+          setSuggestions(allSuggestions.slice(0, 5));
+        })
+        .catch(() => {
+          setSuggestions([{ text: query, type: "original" as const }]);
+        })
+        .finally(() => {
+          setIsLoadingSuggestions(false);
+        });
+    } else {
+      setSuggestions([]);
+    }
+  }, [query]);
+
+  useEffect(() => {
+    if (debouncedQuery.length >= 2) {
+      setIsLoading(true);
+      setShowSuggestions(false);
+
+      searchService
+        .search(debouncedQuery, folder, 50, true)
+        .then((response) => {
+          const results = response.results || [];
+          setSearchResults(results);
+
+          if (response.metadata?.semanticSearchError && !semanticErrorShown) {
+            toast({
+              title: "Semantic search unavailable",
+              description:
+                "AI-powered search is currently unavailable. Using exact and fuzzy matching instead.",
+              variant: "default",
+            });
+            setSemanticErrorShown(true);
+          } else if (!response.metadata?.semanticSearchError) {
+            setSemanticErrorShown(false);
+          }
+
+          const emails = results.map((r) => r.email);
+          onResultsChangeRef.current(emails, true);
+        })
+        .catch(() => {
+          setSearchResults([]);
+          onResultsChangeRef.current([], false);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setSearchResults([]);
+      onResultsChangeRef.current([], false);
+    }
+  }, [debouncedQuery, folder]);
+
+  useEffect(() => {
+    if (query.length >= 2) {
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
+      setSearchResults([]);
+      setSuggestions([]);
+    }
+  }, [query]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        showDropdown
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [showDropdown]);
+
+  const handleInputChange = (value: string) => {
+    setQuery(value);
+    setSelectedIndex(-1);
+  };
+
+  const handleSelectSuggestion = (suggestion: {
+    text: string;
+    type: "contact" | "keyword" | "original";
+  }) => {
+    setQuery(suggestion.text);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    inputRef.current?.focus();
+  };
+
+  const handleSelectEmail = (result: SearchResult) => {
+    setShowDropdown(false);
+    onEmailSelect(result.email);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const suggestionCount = suggestions.length;
+    const resultCount = searchResults.length;
+    const totalItems = suggestionCount + resultCount;
+
+    if (!showDropdown || totalItems === 0) {
+      if (e.key === "Enter" && query.trim()) {
+        e.preventDefault();
+        setIsLoading(false);
+        setShowDropdown(false);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev < totalItems - 1 ? prev + 1 : prev));
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (selectedIndex >= 0) {
+          if (selectedIndex < suggestionCount) {
+            handleSelectSuggestion(suggestions[selectedIndex]);
+          } else if (selectedIndex - suggestionCount < resultCount) {
+            handleSelectEmail(searchResults[selectedIndex - suggestionCount]);
+          }
+        } else {
+          setShowDropdown(false);
+        }
+        break;
+      case "Escape":
+        setShowDropdown(false);
+        inputRef.current?.blur();
+        break;
+    }
+  };
+
+  const handleClear = () => {
+    setQuery("");
+    setSearchResults([]);
+    setSuggestions([]);
+    setShowDropdown(false);
+    onResultsChangeRef.current([], false);
+    inputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && dropdownRef.current) {
+      const selectedElement = dropdownRef.current.children[selectedIndex] as HTMLElement;
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [selectedIndex]);
+
+  const topResults = searchResults.slice(0, 10);
+
+  return (
+    <div ref={containerRef} className={cn("relative flex-1", className)}>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Search emails..."
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (query.length >= 2) {
+              setShowDropdown(true);
+            }
+          }}
+          className="h-9 w-full pl-9 pr-20"
+          aria-label="Search emails"
+          aria-expanded={showDropdown}
+          aria-autocomplete="list"
+        />
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+          {isLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+          {query && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              className="size-6 p-0"
+              aria-label="Clear search"
+            >
+              <X className="size-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {}
+      {showDropdown && query.length >= 2 && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-[100] mt-1 max-h-[500px] w-full overflow-hidden rounded-md border bg-popover shadow-lg"
+          role="listbox"
+        >
+          {}
+          <div className="max-h-[450px] overflow-auto">
+            {}
+            {suggestions.length > 0 && (
+              <div className="border-b">
+                <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 dark:from-blue-950/50 dark:to-purple-950/50">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      <Lightbulb className="size-3" /> Type-ahead Suggestions
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      (Use ↑↓ arrows, press Enter to select)
+                    </span>
+                  </div>
+                </div>
+                {isLoadingSuggestions ? (
+                  <div className="p-3 text-center text-sm text-muted-foreground">
+                    <Loader2 className="mx-auto mb-1 size-3 animate-spin" />
+                    <span className="text-xs">Loading suggestions...</span>
+                  </div>
+                ) : (
+                  <div>
+                    {suggestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion.type}-${suggestion.text}-${index}`}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                        className={cn(
+                          "flex w-full items-center gap-2 border-b px-4 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-blue-50 focus:bg-accent focus:outline-none dark:hover:bg-blue-950/30",
+                          selectedIndex === index && "bg-blue-100 dark:bg-blue-900/40",
+                          suggestion.type === "original" && "bg-amber-50/50 dark:bg-amber-950/20"
+                        )}
+                        role="option"
+                        aria-selected={selectedIndex === index}
+                      >
+                        {suggestion.type === "original" ? (
+                          <Search className="size-4 shrink-0 text-amber-600 dark:text-amber-500" />
+                        ) : suggestion.type === "contact" ? (
+                          <User className="size-4 shrink-0 text-blue-500" />
+                        ) : (
+                          <Hash className="size-4 shrink-0 text-purple-500" />
+                        )}
+                        <span
+                          className={cn(
+                            "flex-1 truncate",
+                            suggestion.type === "original"
+                              ? "font-semibold text-amber-900 dark:text-amber-100"
+                              : "font-medium"
+                          )}
+                        >
+                          {suggestion.text}
+                        </span>
+                        <span className="text-xs capitalize text-muted-foreground">
+                          {suggestion.type === "original"
+                            ? "Your search"
+                            : suggestion.type === "contact"
+                              ? "Contact"
+                              : "Keyword"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {}
+            {query.length >= 2 && (
+              <div>
+                <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground">
+                  <Mail className="size-3" /> Top Results (sorted by relevance)
+                </div>
+                {isLoading && topResults.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <Loader2 className="mx-auto mb-2 size-4 animate-spin" />
+                    Searching...
+                  </div>
+                ) : topResults.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <Mail className="mx-auto mb-2 size-6 opacity-50" />
+                    <p>No results found</p>
+                    <p className="mt-1 text-xs">Try different keywords</p>
+                  </div>
+                ) : (
+                  topResults.map((result, index) => {
+                    const actualIndex = suggestions.length + index;
+                    return (
+                      <button
+                        key={result.email.id}
+                        type="button"
+                        onClick={() => handleSelectEmail(result)}
+                        onMouseEnter={() => setSelectedIndex(actualIndex)}
+                        className={cn(
+                          "w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-accent focus:bg-accent focus:outline-none",
+                          selectedIndex === actualIndex && "bg-accent",
+                          !result.email.isRead && "bg-muted/50"
+                        )}
+                        role="option"
+                        aria-selected={selectedIndex === actualIndex}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center gap-2">
+                              <span className="truncate text-sm font-medium">
+                                {result.email.from}
+                              </span>
+                              {!result.email.isRead && (
+                                <span className="size-2 shrink-0 rounded-full bg-primary" />
+                              )}
+                            </div>
+                            <h4 className="mb-1 line-clamp-1 text-sm font-semibold">
+                              {result.email.subject || "(No subject)"}
+                            </h4>
+                            <p className="mb-2 line-clamp-1 text-xs text-muted-foreground">
+                              {result.email.preview || ""}
+                            </p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="size-3" />
+                                <span>{format(new Date(result.email.sentAt), "dd/MM/yyyy")}</span>
+                              </div>
+                              {result.email.hasAttachments && (
+                                <div className="flex items-center gap-1">
+                                  <Paperclip className="size-3" />
+                                  <span>Attachment</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {}
+          {!showSuggestions && searchResults.length > 0 && (
+            <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Search className="size-3" />
+                <span>
+                  Showing {topResults.length} of {searchResults.length} results for "
+                  {debouncedQuery}"
+                </span>
+              </div>
+              <span className="text-xs">
+                <kbd className="rounded bg-muted px-1 py-0.5">Enter</kbd> for full list
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

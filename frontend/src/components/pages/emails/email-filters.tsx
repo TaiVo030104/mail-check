@@ -1,0 +1,271 @@
+import { format } from "date-fns";
+import { Filter, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+export interface EmailFilterValues {
+  from?: string;
+  unread?: boolean;
+  starred?: boolean;
+  startDate?: Date;
+  endDate?: Date;
+  hasAttachments?: boolean;
+  sort?: "newest" | "oldest" | "sender-asc" | "sender-desc";
+}
+
+interface EmailFiltersProps {
+  filters: EmailFilterValues;
+  onFiltersChange: (filters: EmailFilterValues) => void;
+  onClearFilters: () => void;
+}
+
+export function EmailFilters({ filters, onFiltersChange, onClearFilters }: EmailFiltersProps) {
+  const [localFilters, setLocalFilters] = useState<EmailFilterValues>(filters);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
+
+  const handleApplyFilters = () => {
+    onFiltersChange({ ...localFilters, sort: localFilters.sort || "newest" });
+    setIsOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    setLocalFilters({ sort: "newest" });
+    onClearFilters();
+    setIsOpen(false);
+  };
+
+  const activeFiltersCount = [
+    filters.from,
+    filters.unread ? true : undefined,
+    filters.starred ? true : undefined,
+    filters.startDate,
+    filters.endDate,
+    filters.hasAttachments ? true : undefined,
+  ].filter((value) => value !== undefined && value !== "").length;
+
+  const hasActiveFilters = activeFiltersCount > 0;
+
+  return (
+    <div className={cn("flex items-center gap-2")}>
+      {}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant={hasActiveFilters ? "default" : "outline"}
+            size="sm"
+            className="h-9 gap-2"
+            aria-label="Open filters"
+          >
+            <Filter className="size-4" />
+            <span className="hidden sm:inline">Filters</span>
+            {hasActiveFilters && (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-foreground text-xs font-semibold text-primary">
+                {activeFiltersCount}
+              </span>
+            )}
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Filter Emails</DialogTitle>
+            <DialogDescription>Narrow down your search with advanced filters</DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-6 space-y-6">
+            {}
+            <div className="space-y-2">
+              <Label htmlFor="from-filter">From</Label>
+              <Input
+                id="from-filter"
+                type="email"
+                placeholder="sender@example.com"
+                value={localFilters.from || ""}
+                onChange={(e) =>
+                  setLocalFilters({ ...localFilters, from: e.target.value || undefined })
+                }
+              />
+            </div>
+
+            {}
+            <div className="space-y-4">
+              <Label>Status</Label>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="unread-filter" className="cursor-pointer font-normal">
+                  Unread only
+                </Label>
+                <Switch
+                  id="unread-filter"
+                  checked={localFilters.unread || false}
+                  onCheckedChange={(checked: boolean) =>
+                    setLocalFilters({ ...localFilters, unread: checked ? true : undefined })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="starred-filter" className="cursor-pointer font-normal">
+                  Starred only
+                </Label>
+                <Switch
+                  id="starred-filter"
+                  checked={localFilters.starred || false}
+                  onCheckedChange={(checked: boolean) =>
+                    setLocalFilters({ ...localFilters, starred: checked ? true : undefined })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="attachments-filter" className="cursor-pointer font-normal">
+                  Has attachment
+                </Label>
+                <Switch
+                  id="attachments-filter"
+                  checked={localFilters.hasAttachments || false}
+                  onCheckedChange={(checked: boolean) =>
+                    setLocalFilters({ ...localFilters, hasAttachments: checked ? true : undefined })
+                  }
+                />
+              </div>
+            </div>
+
+            {}
+            <div className="space-y-3">
+              <Label>Date Range</Label>
+
+              <div className="space-y-2">
+                <Label htmlFor="start-date" className="text-xs text-muted-foreground">
+                  From
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="start-date"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !localFilters.startDate && "text-muted-foreground"
+                      )}
+                    >
+                      {localFilters.startDate ? (
+                        format(localFilters.startDate, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={localFilters.startDate}
+                      onSelect={(date: Date | undefined) =>
+                        setLocalFilters({ ...localFilters, startDate: date || undefined })
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end-date" className="text-xs text-muted-foreground">
+                  To
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="end-date"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !localFilters.endDate && "text-muted-foreground"
+                      )}
+                    >
+                      {localFilters.endDate ? (
+                        format(localFilters.endDate, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={localFilters.endDate}
+                      onSelect={(date: Date | undefined) =>
+                        setLocalFilters({ ...localFilters, endDate: date || undefined })
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {}
+            <div className="space-y-2">
+              <Label htmlFor="sort-order">Sort</Label>
+              <Select
+                value={localFilters.sort || "newest"}
+                onValueChange={(value) =>
+                  setLocalFilters({
+                    ...localFilters,
+                    sort: value as EmailFilterValues["sort"],
+                  })
+                }
+              >
+                <SelectTrigger id="sort-order">
+                  <SelectValue placeholder="Select order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Date: newest first</SelectItem>
+                  <SelectItem value="oldest">Date: oldest first</SelectItem>
+                  <SelectItem value="sender-asc">Sender: A–Z</SelectItem>
+                  <SelectItem value="sender-desc">Sender: Z–A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {}
+            <div className="flex gap-2 pt-4">
+              <Button variant="outline" className="flex-1" onClick={handleClearFilters}>
+                <X className="mr-2 size-4" />
+                Clear All
+              </Button>
+              <Button className="flex-1" onClick={handleApplyFilters}>
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
