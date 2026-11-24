@@ -1,10 +1,33 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { LogInDto, SignUpDto } from '../../libs/dtos';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../libs/guards/jwt-auth.guard';
 import { GoogleAuthGuard } from '../../libs/guards/google-auth.guard';
 import { CurrentUser } from '../../libs/decorators';
-import { Response } from 'express';
+import { CookieOptions, Response } from 'express';
+
+// Frontend (Vercel) and backend (Railway) live on different sites, so the
+// refresh-token cookie must be SameSite=None + Secure to be sent cross-site.
+// Set COOKIE_SAME_SITE=none in production; defaults to lax for local dev.
+function refreshCookieOptions(): CookieOptions {
+  const sameSite = (process.env.COOKIE_SAME_SITE ||
+    'lax') as CookieOptions['sameSite'];
+  return {
+    httpOnly: true,
+    secure: sameSite === 'none' || process.env.NODE_ENV === 'production',
+    sameSite,
+  };
+}
+
+const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 @Controller('')
 export class AuthController {
@@ -23,17 +46,15 @@ export class AuthController {
     const { email, password } = data;
     // Direct validation - không cần LocalStrategy
     const result = await this.authService.loginUser(email, password);
-    
+
     // If using cookie authentication, set httpOnly cookie
     if (process.env.USE_COOKIE_AUTH === 'true') {
       res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        ...refreshCookieOptions(),
+        maxAge: REFRESH_COOKIE_MAX_AGE,
       });
     }
-    
+
     return result;
   }
 
@@ -48,21 +69,19 @@ export class AuthController {
   async googleAuthCallback(@Req() req: any, @Res() res: Response) {
     const googleProfile = req.user;
     const result = await this.authService.findOrCreateGoogleUser(googleProfile);
-    
+
     // If using cookie authentication, set httpOnly cookie
     if (process.env.USE_COOKIE_AUTH === 'true') {
       res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // Use Lax for OAuth redirects to ensure cookie is set
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        ...refreshCookieOptions(),
+        maxAge: REFRESH_COOKIE_MAX_AGE,
       });
     }
 
     // Redirect to frontend Google callback route with tokens in query params
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const callbackUrl = `${frontendUrl}/google-callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&email=${result.email}&username=${encodeURIComponent(result.username)}`;
-    
+
     res.redirect(callbackUrl);
   }
 
@@ -81,27 +100,25 @@ export class AuthController {
       useCookieAuth: process.env.USE_COOKIE_AUTH,
       body: req.body,
     });
-    
+
     // Support both cookie and body-based refresh tokens
     const token = req.cookies?.refreshToken || refreshToken;
-    
+
     if (!token) {
       console.error('❌ No refresh token found in request');
       throw new Error('Refresh token not provided');
     }
-    
+
     const result = await this.authService.refreshToken(token);
-    
+
     // If using cookies, set the new refresh token in httpOnly cookie
     if (req.cookies?.refreshToken && process.env.USE_COOKIE_AUTH === 'true') {
       res.cookie('refreshToken', result.refreshToken || token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        ...refreshCookieOptions(),
+        maxAge: REFRESH_COOKIE_MAX_AGE,
       });
     }
-    
+
     return result;
   }
 
@@ -113,13 +130,9 @@ export class AuthController {
   ) {
     // Clear httpOnly cookie if using cookie authentication
     if (process.env.USE_COOKIE_AUTH === 'true') {
-      res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
+      res.clearCookie('refreshToken', refreshCookieOptions());
     }
-    
+
     return this.authService.logout(user.userId);
   }
 
@@ -160,6 +173,10 @@ export class AuthController {
     if (!currentPassword || !newPassword) {
       throw new Error('Current password and new password are required');
     }
-    return this.authService.changePassword(user.userId, currentPassword, newPassword);
+    return this.authService.changePassword(
+      user.userId,
+      currentPassword,
+      newPassword,
+    );
   }
 }
