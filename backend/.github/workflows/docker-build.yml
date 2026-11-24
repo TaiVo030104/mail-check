@@ -1,0 +1,86 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git describe to work
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Get sanitized branch name
+        if: github.ref_name != 'main' && github.ref_name != 'dev' && github.event_name == 'push'
+        id: branch_name
+        run: |
+          SANITIZED_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')
+          echo "sanitized_name=$SANITIZED_NAME" >> $GITHUB_OUTPUT
+
+      - name: Trigger DevOps Preview Deploy
+        if: github.ref_name != 'main' && github.ref_name != 'dev' && github.event_name == 'push'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          repository: awad-final-project/devops
+          event-type: deploy-preview
+          client-payload: '{"app_name": "preview-${{ steps.branch_name.outputs.sanitized_name }}", "branch_backend": "${{ github.ref_name }}", "branch_frontend": "${{ github.ref_name }}", "domain_prefix": "preview-${{ steps.branch_name.outputs.sanitized_name }}"}'
+
+      - name: Trigger DevOps Dev Deploy
+        if: github.ref_name == 'dev' && github.event_name == 'push'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          repository: awad-final-project/devops
+          event-type: deploy-dev
+          client-payload: '{"branch_backend": "${{ github.ref_name }}", "branch_frontend": "${{ github.ref_name }}"}'
+
+      - name: Production deployment note
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "✅ Backend image pushed successfully!"
+          echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main"
+          echo ""
+          echo "⚠️ Production deployment is MANUAL."
+          echo "Go to: https://github.com/awad-final-project/devops/actions/workflows/deploy-prod.yml"
+          echo "Click 'Run workflow' to deploy to production."

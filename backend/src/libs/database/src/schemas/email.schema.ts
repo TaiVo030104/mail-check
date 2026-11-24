@@ -1,0 +1,145 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Document, Schema as MongooseSchema } from 'mongoose';
+
+export type EmailDocument = HydratedDocument<Email>;
+
+export interface IAttachmentRef {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  s3Key: string;
+}
+
+type IEmail = {
+  from: string;
+  to: string;
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  htmlBody?: string;
+  preview: string;
+  isRead: boolean;
+  isStarred: boolean;
+  folder: 'inbox' | 'sent' | 'drafts' | 'starred' | 'archive' | 'trash';
+  sentAt: Date;
+  readAt?: Date;
+  accountId: string;
+  messageId?: string;
+  inReplyTo?: string;
+  attachments?: IAttachmentRef[];
+  hasAttachments?: boolean;
+  labels?: string[];
+  priority?: 'high' | 'normal' | 'low';
+  isSnoozed?: boolean;
+  snoozeUntil?: Date;
+  snoozedAt?: Date;
+  aiSummary?: string;
+  summarizedAt?: Date;
+};
+
+@Schema({
+  collection: 'emails',
+  versionKey: false,
+  timestamps: {
+    createdAt: true,
+    updatedAt: true,
+  },
+})
+export class Email extends Document implements IEmail {
+  @Prop({ required: true })
+  from: string;
+
+  @Prop({ required: true })
+  to: string;
+
+  @Prop({ required: true })
+  subject: string;
+
+  @Prop({ required: true })
+  body: string;
+
+  @Prop({ required: true })
+  preview: string;
+
+  @Prop({ default: false })
+  isRead: boolean;
+
+  @Prop({ default: false })
+  isStarred: boolean;
+
+  @Prop({ required: true, enum: ['inbox', 'sent', 'drafts', 'starred', 'archive', 'trash'] })
+  folder: 'inbox' | 'sent' | 'drafts' | 'starred' | 'archive' | 'trash';
+
+  @Prop({ required: true })
+  sentAt: Date;
+
+  @Prop()
+  readAt?: Date;
+
+  @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'Account' })
+  accountId: string;
+
+  @Prop({ unique: false, sparse: true })
+  gmailMessageId?: string;
+
+  @Prop({ unique: false, sparse: true })
+  imapMessageId?: string;
+
+  @Prop({ type: [String], default: [] })
+  cc?: string[];
+
+  @Prop({ type: [String], default: [] })
+  bcc?: string[];
+
+  @Prop()
+  htmlBody?: string;
+
+  @Prop()
+  messageId?: string;
+
+  @Prop()
+  inReplyTo?: string;
+
+  @Prop({ type: [{ 
+    attachmentId: String, 
+    filename: String, 
+    mimeType: String, 
+    size: Number, 
+    s3Key: String 
+  }], default: [] })
+  attachments?: IAttachmentRef[];
+
+  @Prop({ default: false })
+  hasAttachments?: boolean;
+
+  @Prop({ type: [String], default: [] })
+  labels?: string[];
+
+  @Prop({ type: String, enum: ['high', 'normal', 'low'], default: 'normal' })
+  priority?: 'high' | 'normal' | 'low';
+
+  @Prop({ default: false })
+  isSnoozed?: boolean;
+
+  @Prop()
+  snoozeUntil?: Date;
+
+  @Prop()
+  snoozedAt?: Date;
+
+  @Prop({ type: String })
+  aiSummary?: string;
+
+  @Prop()
+  summarizedAt?: Date;
+
+  @Prop({ type: [Number], default: [] })
+  subjectEmbedding?: number[];
+
+  @Prop({ type: [Number], default: [] })
+  bodyEmbedding?: number[];
+}
+
+export const EmailSchema = SchemaFactory.createForClass(Email);
