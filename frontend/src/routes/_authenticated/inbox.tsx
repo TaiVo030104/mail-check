@@ -252,7 +252,7 @@ function InboxPage() {
 
       <main className="flex flex-1 overflow-hidden" role="main">
         {inbox.viewMode === "kanban" ? (
-          <div className="flex w-full flex-1 overflow-hidden p-4">
+          <div className="flex w-full min-w-0 flex-1 overflow-hidden p-2 md:p-4">
             <EmailKanban
               filters={inbox.filters}
               searchEmails={inbox.isSearching ? inbox.searchResultEmails : undefined}

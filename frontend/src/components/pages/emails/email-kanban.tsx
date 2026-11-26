@@ -546,15 +546,15 @@ export function EmailKanban({
   };
 
   return (
-    <div className="flex h-full min-h-[500px] flex-1 flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Email Kanban Board</h2>
+    <div className="flex h-full min-h-[500px] min-w-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold md:text-xl">Email Kanban Board</h2>
           <p className="text-sm text-muted-foreground">
             Drag emails between columns to organize your workflow.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowColumnManager(true)}>
             <Settings className="mr-2 size-4" />
             Manage Columns
